@@ -1,0 +1,16 @@
+{
+  "name": "gelana-inventory-and-sales-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@gelana-inventory-and-sales-management-system/web",
+    "dev:api": "npm run dev --workspace=@gelana-inventory-and-sales-management-system/api",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  }
+}
