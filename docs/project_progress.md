@@ -6,26 +6,27 @@ Status vocabulary: `[Done]`, `[In Progress]`, `[Todo]`, `[Blocked]`.
 
 ## Phase 1 --- Project foundation
 
--   \[In Progress\] Configure npm workspaces monorepo
--   \[In Progress\] Configure React + TypeScript + Vite frontend
--   \[In Progress\] Configure Express + TypeScript backend
--   \[In Progress\] Configure strict TypeScript
--   \[In Progress\] Configure Oxlint
--   \[Todo\] Configure root `.gitignore`
--   \[Todo\] Configure environment examples
--   \[Todo\] Configure Drizzle + PostgreSQL client
--   \[Todo\] Verify frontend dev command
--   \[Todo\] Verify API health endpoint
--   \[Todo\] Verify typecheck
--   \[Todo\] Verify lint
--   \[Todo\] Verify build
--   \[Todo\] Commit clean bootstrap
+-   \[Done\] Configure npm workspaces monorepo
+-   \[Done\] Configure React + TypeScript + Vite frontend
+-   \[Done\] Configure Express + TypeScript backend
+-   \[Done\] Configure strict TypeScript
+-   \[Done\] Configure Oxlint
+-   \[Done\] Configure root `.gitignore`
+-   \[Done\] Configure environment examples
+-   \[Done\] Configure Drizzle + PostgreSQL client
+-   \[Done\] Verify frontend dev command
+-   \[Done\] Verify API health endpoint
+-   \[Done\] Verify typecheck
+-   \[Done\] Verify lint
+-   \[Done\] Verify build
+-   \[Done\] Commit clean bootstrap
+-   \[Done\] Normalize documentation structure
 
 ## Phase 2 --- Branches, users and authentication
 
--   \[Todo\] Design `branches` table
--   \[Todo\] Design `users` table
--   \[Todo\] Create migrations
+-   \[Done\] Design `branches` table
+-   \[Done\] Design `users` table
+-   \[Done\] Create migrations
 -   \[Todo\] Seed initial branches
 -   \[Todo\] Seed/create owner account safely
 -   \[Todo\] Implement authentication
@@ -118,4 +119,4 @@ Status vocabulary: `[Done]`, `[In Progress]`, `[Todo]`, `[Blocked]`.
 
 ## Current next task
 
-Finish **Phase 1** completely before implementing business entities.
+Implement authentication foundation and seed initial branches/owner.

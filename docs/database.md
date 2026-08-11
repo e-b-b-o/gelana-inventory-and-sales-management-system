@@ -24,7 +24,20 @@ implementation.
 ### Identity / organization
 
 -   `branches`
+    -   `id`: uuid (PK)
+    -   `name`: varchar
+    -   `code`: varchar (unique)
+    -   `is_active`: boolean
+    -   `created_at`, `updated_at`: timestamp with timezone
 -   `users`
+    -   `id`: uuid (PK)
+    -   `name`: varchar
+    -   `email`: varchar (unique)
+    -   `password_hash`: varchar
+    -   `role`: varchar (enum: OWNER, EMPLOYEE)
+    -   `branch_id`: uuid (FK to branches, nullable for OWNER)
+    -   `is_active`: boolean
+    -   `created_at`, `updated_at`: timestamp with timezone
 
 ### Catalog
 

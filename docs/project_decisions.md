@@ -117,3 +117,18 @@ physically arrive.
 
 **Reason:** It is the selected Vite linter and avoids maintaining a
 second overlapping linter initially.
+
+------------------------------------------------------------------------
+
+## 2026-08 --- User Identity and Role Modeling
+
+**Decision:**
+- **Identifier**: Use `email` instead of `username` for login.
+- **Roles**: Use `varchar` with Drizzle-enforced enum-style values (`"OWNER" | "EMPLOYEE"`) instead of PostgreSQL enums.
+- **Branch Association**: `branch_id` is nullable. `OWNER` can have a null branch_id (global oversight), while an `EMPLOYEE` is typically tied to a specific branch.
+
+**Reason:**
+- Email provides a more standard identity foundation.
+- Varchar roles keep migrations and TypeScript clean compared to managing PostgreSQL custom enums.
+- Nullable branch_id handles global administrators naturally without needing a "fake" branch.
+
