@@ -27,6 +27,7 @@ Status vocabulary: `[Done]`, `[In Progress]`, `[Todo]`, `[Blocked]`.
 -   \[Done\] Design `branches` table
 -   \[Done\] Design `users` table
 -   \[Done\] Create migrations
+-   \[Done\] Apply migrations
 -   \[Todo\] Seed initial branches
 -   \[Todo\] Seed/create owner account safely
 -   \[Todo\] Implement authentication
