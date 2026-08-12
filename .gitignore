@@ -45,3 +45,6 @@ Thumbs.db
 # Temporary files
 .tmp/
 tmp/
+
+# Private docs
+docs/MY_LEARNING_GUIDE.md
