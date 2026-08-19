@@ -13,6 +13,6 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  const user = authenticateUser(parsed.data);
+  const user = await authenticateUser(parsed.data);
   res.json({ message: "Login successfull", user });
 });
