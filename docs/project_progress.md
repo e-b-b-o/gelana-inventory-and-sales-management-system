@@ -28,9 +28,10 @@ Status vocabulary: `[Done]`, `[In Progress]`, `[Todo]`, `[Blocked]`.
 -   \[Done\] Design `users` table
 -   \[Done\] Create migrations
 -   \[Done\] Apply migrations
--   \[Todo\] Seed initial branches
--   \[Todo\] Seed/create owner account safely
--   \[Todo\] Implement authentication
+-   \[Done\] Seed initial branches
+-   \[Done\] Seed/create owner account safely
+-   \[Done\] Centralized error handling architecture
+-   \[In Progress\] Implement authentication
 -   \[Todo\] Implement role authorization
 -   \[Todo\] Implement branch-scoped authorization
 -   \[Todo\] Add auth tests
@@ -120,4 +121,4 @@ Status vocabulary: `[Done]`, `[In Progress]`, `[Todo]`, `[Blocked]`.
 
 ## Current next task
 
-Implement authentication foundation and seed initial branches/owner.
+Implement JWT authentication, HTTP-only cookies, and authorization middleware.
