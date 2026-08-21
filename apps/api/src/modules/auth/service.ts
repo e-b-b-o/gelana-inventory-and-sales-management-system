@@ -22,7 +22,7 @@ export async function authenticateUser(input: LoginInput) {
     throw new AppError("User is inactive", 401);
   }
 
-  const isPasswordValid = argon2.verify(user.passwordHash, input.password);
+  const isPasswordValid = await argon2.verify(user.passwordHash, input.password);
 
   if (!isPasswordValid) {
     throw new AppError("Invalid email or password", 401);

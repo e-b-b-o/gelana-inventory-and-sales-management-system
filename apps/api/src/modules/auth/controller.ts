@@ -3,7 +3,6 @@ import { loginSchema } from "./schema.js";
 import { authenticateUser } from "./service.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { signToken } from "./jwt.js";
-import strict from "node:assert/strict";
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
@@ -30,5 +29,19 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     maxAge: 24 * 60 * 60 * 1000,
   });
 
-  res.json({ message: "Login successfull", user });
+  res.json({ message: "Login successful", user });
+});
+
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
+  res.json({ message: "Logged out successfully" });
+});
+
+export const getMe = asyncHandler(async (req: Request, res: Response) => {
+  res.json({ user: req.user });
 });
