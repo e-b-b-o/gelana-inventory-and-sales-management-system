@@ -28,24 +28,32 @@ Status vocabulary: `[Done]`, `[In Progress]`, `[Todo]`, `[Blocked]`.
 -   \[Done\] Design `users` table
 -   \[Done\] Create migrations
 -   \[Done\] Apply migrations
--   \[Done\] Seed initial branches
--   \[Done\] Seed/create owner account safely
--   \[Done\] Centralized error handling architecture
--   \[In Progress\] Implement authentication
--   \[Todo\] Implement role authorization
--   \[Todo\] Implement branch-scoped authorization
--   \[Todo\] Add auth tests
+-   \[Done\] Seed initial branches (3 branches + OWNER account)
+-   \[Done\] Seed/create owner account safely (Argon2 hash, no plaintext)
+-   \[Done\] Centralized error handling (`AppError`, `asyncHandler`, `errorHandler` middleware)
+-   \[Done\] JWT signing and verification (`apps/api/src/modules/auth/jwt.ts`)
+-   \[Done\] HTTP-only cookie login/logout (`POST /api/v1/auth/login`, `POST /api/v1/auth/logout`)
+-   \[Done\] `authenticate` middleware (`apps/api/src/middleware/authenticate.ts`)
+-   \[Done\] `req.user` TypeScript declaration merging (`apps/api/src/types/`)
+-   \[Done\] `GET /api/v1/auth/me` protected route
+-   \[Done\] `authorizeRole` middleware (`apps/api/src/middleware/authorize.ts`)
+-   \[Done\] `authorizeBranchAccess` middleware
+-   \[Done\] Manual testing --- all scenarios pass (valid login, wrong password, nonexistent email, invalid body, /me with/without cookie, logout)
+-   \[Todo\] API hardening (Helmet, CORS, Morgan, rate limiting)
+-   \[Todo\] Add auth integration tests
 
 ## Phase 3 --- Products and inventory
 
--   \[Todo\] Categories
--   \[Todo\] Products and SKU
--   \[Todo\] Branch inventory
--   \[Todo\] Low-stock threshold
--   \[Todo\] Stock receipt
--   \[Todo\] Stock adjustment
--   \[Todo\] Inventory movement ledger
--   \[Todo\] Transaction tests
+-   \[Todo\] Categories schema + migration
+-   \[Todo\] Products schema + migration
+-   \[Todo\] Category CRUD (OWNER-only write)
+-   \[Todo\] Product CRUD (OWNER-only write)
+-   \[Todo\] Branch inventory schema + migration
+-   \[Todo\] Inventory movements schema + migration
+-   \[Todo\] Stock receiving
+-   \[Todo\] Stock adjustments
+-   \[Todo\] Inventory transaction tests
+
 
 ## Phase 4 --- Sales
 
@@ -121,4 +129,4 @@ Status vocabulary: `[Done]`, `[In Progress]`, `[Todo]`, `[Blocked]`.
 
 ## Current next task
 
-Implement JWT authentication, HTTP-only cookies, and authorization middleware.
+API hardening: Helmet, CORS, Morgan, rate limiting. Then categories + products schema and CRUD.
