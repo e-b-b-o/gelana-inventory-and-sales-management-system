@@ -2,11 +2,39 @@ import express from "express";
 import { authRouter } from "./modules/auth/routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import cors from "cors";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
 
 export const app = express();
 
+const ALLOWED_ORIGINS = ["https://localhost:5173"];
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests , please try again later" },
+});
+
+app.use(helmet());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+  }),
+);
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(express.json());
 app.use(cookieParser());
+app.use(generalLimiter);
 
 app.get("/api/v1/health", (_req, res) => {
   res.json({
