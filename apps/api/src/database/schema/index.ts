@@ -3,3 +3,7 @@ export * from "./users.js";
 export * from "./branchAssignments.js";
 export * from "./categories.js";
 export * from "./products.js";
+export * from "./productUnits.js";
+export * from "./productPrices.js";
+export * from "./suppliers.js";
+export * from "./paymentMethods.js";

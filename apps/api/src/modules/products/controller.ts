@@ -75,4 +75,108 @@ export class ProductsController {
       res.status(500).json({ error: "Internal server error" });
     }
   }
+
+  // --- Product Units ---
+
+  async getProductUnits(req: Request, res: Response) {
+    try {
+      const units = await productsService.getProductUnits(req.params.id as string);
+      res.json(units);
+    } catch (error) {
+      console.error("[ProductsController.getProductUnits]", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  async createProductUnit(req: Request, res: Response) {
+    try {
+      const { createProductUnitSchema } = await import("./schema.js");
+      const data = createProductUnitSchema.parse(req.body);
+      const unit = await productsService.createProductUnit(req.params.id as string, data);
+      res.status(201).json(unit);
+    } catch (error) {
+      const { z } = await import("zod");
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: (error as any).errors });
+      }
+      if (error instanceof Error) {
+        if (error.message.includes("not found")) return res.status(404).json({ error: error.message });
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("[ProductsController.createProductUnit]", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  async updateProductUnit(req: Request, res: Response) {
+    try {
+      const { updateProductUnitSchema } = await import("./schema.js");
+      const data = updateProductUnitSchema.parse(req.body);
+      const unit = await productsService.updateProductUnit(req.params.id as string, req.params.unitId as string, data);
+      res.json(unit);
+    } catch (error) {
+      const { z } = await import("zod");
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: (error as any).errors });
+      }
+      if (error instanceof Error) {
+        if (error.message.includes("not found")) return res.status(404).json({ error: error.message });
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("[ProductsController.updateProductUnit]", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  async toggleProductUnitStatus(req: Request, res: Response) {
+    try {
+      const { toggleProductUnitStatusSchema } = await import("./schema.js");
+      const data = toggleProductUnitStatusSchema.parse(req.body);
+      const unit = await productsService.toggleProductUnitStatus(req.params.id as string, req.params.unitId as string, data);
+      res.json(unit);
+    } catch (error) {
+      const { z } = await import("zod");
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: (error as any).errors });
+      }
+      if (error instanceof Error) {
+        if (error.message.includes("not found")) return res.status(404).json({ error: error.message });
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("[ProductsController.toggleProductUnitStatus]", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  // --- Product Prices ---
+
+  async getProductUnitPrices(req: Request, res: Response) {
+    try {
+      const prices = await productsService.getProductUnitPrices(req.params.id as string, req.params.unitId as string);
+      res.json(prices);
+    } catch (error) {
+      console.error("[ProductsController.getProductUnitPrices]", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  async setProductUnitPrice(req: Request, res: Response) {
+    try {
+      const { setProductUnitPriceSchema } = await import("./schema.js");
+      const data = setProductUnitPriceSchema.parse(req.body);
+      const price = await productsService.setProductUnitPrice(req.params.id as string, req.params.unitId as string, data);
+      res.status(201).json(price);
+    } catch (error) {
+      const { z } = await import("zod");
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: (error as any).errors });
+      }
+      if (error instanceof Error) {
+        if (error.message.includes("not found")) return res.status(404).json({ error: error.message });
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("[ProductsController.setProductUnitPrice]", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
 }

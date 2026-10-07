@@ -5,6 +5,7 @@ import { useCategories, useUpdateCategoryStatus, type Category } from "../api";
 import { useProducts, useUpdateProductStatus, type Product } from "../../products/api";
 import { CategoryFormModal } from "./CategoryFormModal";
 import { ProductFormModal } from "../../products/components/ProductFormModal";
+import { ProductUnitsModal } from "../../products/components/ProductUnitsModal";
 
 export function Catalog() {
   const { data: userResponse } = useQuery({ queryKey: ["me"], queryFn: getMe });
@@ -22,6 +23,9 @@ export function Catalog() {
 
   const [isProdFormOpen, setIsProdFormOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  const [isUnitsModalOpen, setIsUnitsModalOpen] = useState(false);
+  const [selectedProductForUnits, setSelectedProductForUnits] = useState<Product | null>(null);
 
   const handleAddCat = () => {
     setSelectedCategory(null);
@@ -57,6 +61,11 @@ export function Catalog() {
     if (window.confirm(confirmMessage)) {
       await productStatusMutation.mutateAsync({ id: product.id, isActive: !product.isActive });
     }
+  };
+
+  const handleManageUnits = (product: Product) => {
+    setSelectedProductForUnits(product);
+    setIsUnitsModalOpen(true);
   };
 
   if (isCatsLoading || isProdsLoading) {
@@ -213,6 +222,12 @@ export function Catalog() {
                       <td className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-3">
                           <button
+                            onClick={() => handleManageUnits(product)}
+                            className="text-sm font-bold text-slate-600 hover:text-slate-800"
+                          >
+                            Units
+                          </button>
+                          <button
                             onClick={() => handleEditProd(product)}
                             className="text-sm font-bold text-primary hover:text-primary-hover"
                           >
@@ -252,6 +267,11 @@ export function Catalog() {
         isOpen={isProdFormOpen}
         onClose={() => setIsProdFormOpen(false)}
         product={selectedProduct}
+      />
+      <ProductUnitsModal
+        isOpen={isUnitsModalOpen}
+        onClose={() => setIsUnitsModalOpen(false)}
+        product={selectedProductForUnits}
       />
     </div>
   );

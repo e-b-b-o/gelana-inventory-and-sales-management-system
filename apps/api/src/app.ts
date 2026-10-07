@@ -4,6 +4,8 @@ import { usersRouter } from "./modules/users/routes.js";
 import { branchesRouter } from "./modules/branches/routes.js";
 import { categoriesRouter } from "./modules/categories/routes.js";
 import { productsRouter } from "./modules/products/routes.js";
+import { suppliersRouter } from "./modules/suppliers/routes.js";
+import { paymentMethodsRouter } from "./modules/payment-methods/routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
@@ -52,5 +54,7 @@ app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/branches", branchesRouter);
 app.use("/api/v1/categories", categoriesRouter);
 app.use("/api/v1/products", productsRouter);
+app.use("/api/v1/suppliers", suppliersRouter);
+app.use("/api/v1/payment-methods", paymentMethodsRouter);
 
 app.use(errorHandler);

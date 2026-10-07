@@ -21,3 +21,26 @@ export const toggleProductStatusSchema = z.object({
   isActive: z.boolean(),
 });
 export type ToggleProductStatusInput = z.infer<typeof toggleProductStatusSchema>;
+
+export const createProductUnitSchema = z.object({
+  name: z.string().trim().min(1, "Unit name is required").max(255),
+  conversionQuantity: z.coerce.number().positive("Conversion quantity must be > 0"),
+  isActive: z.boolean().optional().default(true),
+});
+export type CreateProductUnitInput = z.infer<typeof createProductUnitSchema>;
+
+export const updateProductUnitSchema = z.object({
+  name: z.string().trim().min(1, "Unit name is required").max(255),
+  conversionQuantity: z.coerce.number().positive("Conversion quantity must be > 0").optional(),
+});
+export type UpdateProductUnitInput = z.infer<typeof updateProductUnitSchema>;
+
+export const toggleProductUnitStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+export type ToggleProductUnitStatusInput = z.infer<typeof toggleProductUnitStatusSchema>;
+
+export const setProductUnitPriceSchema = z.object({
+  sellingPrice: z.coerce.number().min(0, "Price must be >= 0"),
+});
+export type SetProductUnitPriceInput = z.infer<typeof setProductUnitPriceSchema>;

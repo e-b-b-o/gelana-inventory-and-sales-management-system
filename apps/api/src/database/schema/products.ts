@@ -20,11 +20,6 @@ export const products = pgTable("products", {
   brand: varchar("brand", { length: 255 }),
   description: text("description"),
   imageUrl: varchar("image_url", { length: 1024 }),
-  unit: varchar("unit", { length: 20 }).notNull(),
-  defaultSellingPrice: numeric("default_selling_price", {
-    precision: 12,
-    scale: 2,
-  }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
     .notNull()

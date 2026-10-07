@@ -10,6 +10,7 @@ vi.mock("../../config/database.js", () => ({
     insert: vi.fn(),
     update: vi.fn(),
     execute: vi.fn(),
+    transaction: vi.fn(),
   },
 }));
 
@@ -30,18 +31,21 @@ describe("ProductsService", () => {
         }),
       } as any);
 
-      // Mock SKU sequence
-      vi.mocked(db.execute).mockResolvedValue({
-        rows: [{ nextval: "42" }],
-      } as any);
-
-      // Mock product insertion
       const mockInsertedProduct = { id: "prod-1", sku: "PRD-000042", name: "Test Product" };
-      vi.mocked(db.insert).mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([mockInsertedProduct]),
-        }),
-      } as any);
+
+      vi.mocked(db.transaction).mockImplementation(async (cb) => {
+        const mockTx = {
+          execute: vi.fn().mockResolvedValue({
+            rows: [{ nextval: "42" }],
+          }),
+          insert: vi.fn().mockReturnValue({
+            values: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([mockInsertedProduct]),
+            }),
+          }),
+        };
+        return cb(mockTx as any);
+      });
 
       const data = {
         name: "Test Product",
@@ -54,8 +58,6 @@ describe("ProductsService", () => {
       const result = await service.createProduct(data);
 
       expect(result).toEqual(mockInsertedProduct);
-      expect(db.execute).toHaveBeenCalled();
-      expect(db.insert).toHaveBeenCalled();
     });
 
     it("should reject creation if category is inactive", async () => {
@@ -79,28 +81,32 @@ describe("ProductsService", () => {
 
   describe("updateProduct", () => {
     it("should allow updating product details", async () => {
-      // Mock category lookup
-      vi.mocked(db.select).mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: "cat-1", isActive: true }]),
-        }),
-      } as any);
-
-      // Mock current product lookup
-      vi.mocked(db.select).mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: "prod-1", categoryId: "cat-1" }]),
-        }),
-      } as any);
-
       const mockUpdatedProduct = { id: "prod-1", name: "Updated Name" };
-      vi.mocked(db.update).mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([mockUpdatedProduct]),
+      
+      vi.mocked(db.transaction).mockImplementation(async (cb) => {
+        const mockTx = {
+          select: vi.fn().mockReturnValue({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn()
+                .mockResolvedValueOnce([{ id: "cat-1", isActive: true }]) // category
+                .mockResolvedValueOnce([{ id: "prod-1", categoryId: "cat-1" }]) // current product
+                .mockResolvedValueOnce([{ id: "unit-1", isBase: true }]) // base unit
+                .mockResolvedValueOnce([{ id: "price-1", sellingPrice: "100" }]), // current price
+            }),
           }),
-        }),
-      } as any);
+          update: vi.fn().mockReturnValue({
+            set: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([mockUpdatedProduct]),
+              }),
+            }),
+          }),
+          insert: vi.fn().mockReturnValue({
+            values: vi.fn().mockResolvedValue(true),
+          })
+        };
+        return cb(mockTx as any);
+      });
 
       const result = await service.updateProduct("prod-1", { name: "Updated Name", categoryId: "cat-1" });
       expect(result).toEqual(mockUpdatedProduct);

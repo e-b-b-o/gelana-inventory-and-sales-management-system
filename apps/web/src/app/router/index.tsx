@@ -4,6 +4,8 @@ import { AppShell } from "../layout/AppShell";
 import { Employees } from "../../features/users/components/Employees";
 import { Branches } from "../../features/branches/components/Branches";
 import { Catalog } from "../../features/categories/components/Catalog";
+import { Suppliers } from "../../features/suppliers/components/Suppliers";
+import { PaymentMethods } from "../../features/payment-methods/components/PaymentMethods";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "../../features/auth/api/auth";
 
@@ -71,6 +73,14 @@ export const router = createBrowserRouter([
           {
             path: "catalog",
             element: <Catalog />
+          },
+          {
+            path: "suppliers",
+            element: <Suppliers />
+          },
+          {
+            path: "payment-methods",
+            element: <PaymentMethods />
           }
         ]
       }

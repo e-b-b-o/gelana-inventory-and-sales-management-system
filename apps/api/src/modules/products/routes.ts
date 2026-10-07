@@ -17,4 +17,14 @@ router.post("/", authorizeRole(["OWNER"]), controller.createProduct.bind(control
 router.put("/:id", authorizeRole(["OWNER"]), controller.updateProduct.bind(controller));
 router.patch("/:id/status", authorizeRole(["OWNER"]), controller.toggleProductStatus.bind(controller));
 
+// Product Units operations
+router.get("/:id/units", controller.getProductUnits.bind(controller));
+router.post("/:id/units", authorizeRole(["OWNER"]), controller.createProductUnit.bind(controller));
+router.put("/:id/units/:unitId", authorizeRole(["OWNER"]), controller.updateProductUnit.bind(controller));
+router.patch("/:id/units/:unitId/status", authorizeRole(["OWNER"]), controller.toggleProductUnitStatus.bind(controller));
+
+// Product Unit Prices operations
+router.get("/:id/units/:unitId/prices", controller.getProductUnitPrices.bind(controller));
+router.post("/:id/units/:unitId/prices", authorizeRole(["OWNER"]), controller.setProductUnitPrice.bind(controller));
+
 export const productsRouter = router;

@@ -7,13 +7,12 @@ on **gelana-inventory-and-sales-management-system**.
 
 Before changing code, read these files in order:
 
-1.  `docs/instruction.md`
-2.  `docs/project_plan.md`
-3.  `docs/project_progress.md`
-4.  `docs/project_decisions.md`
-5.  `docs/src.md`
-6.  `docs/database.md` when touching persistence
-7.  `docs/api.md` when touching backend/API contracts
+1.  `project_decisions.md` (Business source of truth)
+2.  `docs/technical_design.md` (Technical architecture)
+3.  `docs/implementation_plan.md` (Vertical slice milestones)
+4.  `docs/implementation_rules.md` (Rules for Antigravity)
+5.  `docs/ui_design_reference.md` (Stitch UI references)
+6.  `docs/implementation_progress.md` (Current progress)
 
 Then inspect the relevant existing code before editing anything.
 
