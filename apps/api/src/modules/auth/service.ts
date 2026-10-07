@@ -15,17 +15,17 @@ export async function authenticateUser(input: LoginInput) {
   const user = foundUsers[0];
 
   if (!user) {
-    throw new AppError("Invalid email or password", 401);
+    throw new AppError("Invalid email or password", 401, "AUTHENTICATION_ERROR");
   }
 
   if (!user.isActive) {
-    throw new AppError("User is inactive", 401);
+    throw new AppError("User is inactive", 401, "AUTHENTICATION_ERROR");
   }
 
   const isPasswordValid = await argon2.verify(user.passwordHash, input.password);
 
   if (!isPasswordValid) {
-    throw new AppError("Invalid email or password", 401);
+    throw new AppError("Invalid email or password", 401, "AUTHENTICATION_ERROR");
   }
 
   return {

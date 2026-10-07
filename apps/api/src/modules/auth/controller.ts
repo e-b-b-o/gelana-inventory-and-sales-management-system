@@ -3,15 +3,13 @@ import { loginSchema } from "./schema.js";
 import { authenticateUser } from "./service.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { signToken } from "./jwt.js";
+import { AppError } from "../../utils/errors.js";
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
 
   if (!parsed.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid input", details: parsed.error.format() });
-    return;
+    throw new AppError("Invalid input", 400, "VALIDATION_ERROR", parsed.error.format());
   }
 
   const user = await authenticateUser(parsed.data);

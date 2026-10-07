@@ -1,5 +1,9 @@
 import express from "express";
 import { authRouter } from "./modules/auth/routes.js";
+import { usersRouter } from "./modules/users/routes.js";
+import { branchesRouter } from "./modules/branches/routes.js";
+import { categoriesRouter } from "./modules/categories/routes.js";
+import { productsRouter } from "./modules/products/routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
@@ -9,7 +13,7 @@ import rateLimit from "express-rate-limit";
 
 export const app = express();
 
-const ALLOWED_ORIGINS = ["https://localhost:5173"];
+const ALLOWED_ORIGINS = ["http://localhost:5173"];
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
@@ -44,5 +48,9 @@ app.get("/api/v1/health", (_req, res) => {
 });
 
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/users", usersRouter);
+app.use("/api/v1/branches", branchesRouter);
+app.use("/api/v1/categories", categoriesRouter);
+app.use("/api/v1/products", productsRouter);
 
 app.use(errorHandler);
