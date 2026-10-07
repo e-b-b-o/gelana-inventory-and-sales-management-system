@@ -11,30 +11,64 @@ async function seed() {
     { name: "BRANCH-2", code: "123457" },
     { name: "BRANCH-3", code: "123458" },
   ];
-  await db
+  const insertedBranches = await db
     .insert(branches)
     .values(branchData)
-    .onConflictDoNothing({ target: branches.code });
+    .onConflictDoNothing({ target: branches.code })
+    .returning();
 
-  //OWNER
+  // If onConflictDoNothing prevented returning IDs because they already exist, we need to query them
+  const allBranches = await db.select().from(branches);
+  const branch1 = allBranches.find(b => b.code === "123456");
 
-  console.log("Seeding Owner");
+  console.log("Seeding Development Users");
 
-  const rawPassword = "123456";
+  const rawPassword = "password123";
   const passwordHash = await argon2.hash(rawPassword);
 
+  // Development Owner
   await db
     .insert(users)
     .values({
-      name: "Gelana Techan",
-      email: "gelanatechan@gmail.com",
+      name: "Development Owner",
+      email: "owner@dev.local",
       passwordHash,
       role: "OWNER",
       isActive: true,
     })
     .onConflictDoNothing({ target: users.email });
 
-  console.log("Seeding complete");
+  // Development Employee
+  if (branch1) {
+    await db
+      .insert(users)
+      .values({
+        name: "Development Employee",
+        email: "employee@dev.local",
+        passwordHash,
+        role: "EMPLOYEE",
+        branchId: branch1.id,
+        isActive: true,
+      })
+      .onConflictDoNothing({ target: users.email });
+  }
+
+  // Development Deactivated User (for testing deactivated behavior)
+  if (branch1) {
+    await db
+      .insert(users)
+      .values({
+        name: "Development Deactivated",
+        email: "deactivated@dev.local",
+        passwordHash,
+        role: "EMPLOYEE",
+        branchId: branch1.id,
+        isActive: false,
+      })
+      .onConflictDoNothing({ target: users.email });
+  }
+
+  console.log("Seeding complete. Use password 'password123' for all development users.");
   process.exit(0);
 }
 
