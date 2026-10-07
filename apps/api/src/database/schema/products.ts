@@ -5,14 +5,21 @@ import {
   varchar,
   boolean,
   timestamp,
+  pgSequence,
+  text
 } from "drizzle-orm/pg-core";
 import { categories } from "./categories.js";
+
+export const productSkuSeq = pgSequence("product_sku_seq", { startWith: 1, increment: 1 });
 
 export const products = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),
   sku: varchar("sku", { length: 100 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
-  categoryId: uuid("category_id").references(() => categories.id),
+  categoryId: uuid("category_id").references(() => categories.id).notNull(),
+  brand: varchar("brand", { length: 255 }),
+  description: text("description"),
+  imageUrl: varchar("image_url", { length: 1024 }),
   unit: varchar("unit", { length: 20 }).notNull(),
   defaultSellingPrice: numeric("default_selling_price", {
     precision: 12,
