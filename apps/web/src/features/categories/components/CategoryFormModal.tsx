@@ -58,43 +58,43 @@ export function CategoryFormModal({ isOpen, onClose, category }: CategoryFormMod
   const isEditing = !!category;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm shadow-card border border-neutral-200/60 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/40 backdrop-blur-sm">
+      <div className="bg-surface-container-lowest rounded-xl p-space-md w-full max-w-sm shadow-sm border border-outline-variant relative">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-dark-slate">
+          <h2 className="text-headline-sm font-headline-sm text-on-surface">
             {isEditing ? "Edit Category" : "Add Category"}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface">
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-text mb-2">Category Name</label>
+            <label className="block text-label-sm font-label-sm text-on-surface mb-1.5">
+              Category Name <span className="text-error">*</span>
+            </label>
             <input
               {...register("name")}
-              className="w-full rounded-xl border border-slate-200 bg-input-bg py-3 px-4 text-sm font-semibold text-dark-slate focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/15"
+              className={`w-full h-[38px] px-3 rounded border ${errors.name ? 'border-error' : 'border-outline-variant'} bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20`}
               placeholder="e.g. Writing"
               autoFocus
             />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message as string}</p>}
+            {errors.name && <p className="text-error text-label-sm font-label-sm mt-1">{errors.name.message as string}</p>}
           </div>
 
           <div className="pt-4 flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="py-3 px-6 rounded-xl font-bold text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+              className="h-[38px] px-4 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-md text-label-md transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="py-3 px-6 rounded-xl bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-bold text-sm shadow-btn transition-all duration-150 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="h-[38px] px-4 rounded bg-primary hover:bg-primary-hover text-on-primary font-label-md text-label-md shadow-sm transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isSubmitting ? "Saving..." : isEditing ? "Save Changes" : "Create Category"}
             </button>

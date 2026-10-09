@@ -116,79 +116,93 @@ export function EmployeeFormModal({ isOpen, onClose, user }: EmployeeFormModalPr
   const isEditing = !!user;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-card border border-neutral-200/60 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/40 backdrop-blur-sm">
+      <div className="bg-surface-container-lowest rounded-xl p-space-md w-full max-w-md shadow-sm border border-outline-variant relative">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-dark-slate">
+          <h2 className="text-headline-sm font-headline-sm text-on-surface">
             {isEditing ? "Edit Employee" : "Add Employee"}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface transition-colors">
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-text mb-2">Name</label>
+            <label className="block text-label-sm font-label-sm text-on-surface mb-1.5">
+              Name <span className="text-error">*</span>
+            </label>
             <input
               {...register("name")}
-              className="w-full rounded-xl border border-slate-200 bg-input-bg py-3 px-4 text-sm font-semibold text-dark-slate focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/15"
+              className={`w-full h-[38px] px-3 rounded border ${errors.name ? 'border-error' : 'border-outline-variant'} bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors`}
               placeholder="Full Name"
             />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message as string}</p>}
+            {errors.name && <p className="text-error text-label-sm font-label-sm mt-1">{errors.name.message as string}</p>}
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-text mb-2">Email</label>
+            <label className="block text-label-sm font-label-sm text-on-surface mb-1.5">
+              Email <span className="text-error">*</span>
+            </label>
             <input
               {...register("email")}
-              className="w-full rounded-xl border border-slate-200 bg-input-bg py-3 px-4 text-sm font-semibold text-dark-slate focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/15"
+              className={`w-full h-[38px] px-3 rounded border ${errors.email ? 'border-error' : 'border-outline-variant'} bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors`}
               placeholder="email@example.com"
               type="email"
             />
-            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message as string}</p>}
+            {errors.email && <p className="text-error text-label-sm font-label-sm mt-1">{errors.email.message as string}</p>}
           </div>
 
           {!isEditing && (
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted-text mb-2">Password</label>
+              <label className="block text-label-sm font-label-sm text-on-surface mb-1.5">
+                Password <span className="text-error">*</span>
+              </label>
               <input
                 {...register("password")}
-                className="w-full rounded-xl border border-slate-200 bg-input-bg py-3 px-4 text-sm font-semibold text-dark-slate focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/15"
+                className={`w-full h-[38px] px-3 rounded border ${errors.password ? 'border-error' : 'border-outline-variant'} bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors`}
                 placeholder="Minimum 6 characters"
                 type="password"
               />
-              {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message as string}</p>}
+              {errors.password && <p className="text-error text-label-sm font-label-sm mt-1">{errors.password.message as string}</p>}
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-text mb-2">Role</label>
-            <select
-              {...register("role")}
-              className="w-full rounded-xl border border-slate-200 bg-input-bg py-3 px-4 text-sm font-semibold text-dark-slate focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/15"
-            >
-              <option value="EMPLOYEE">Employee</option>
-              <option value="OWNER">Owner</option>
-            </select>
-            {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role.message as string}</p>}
+            <label className="block text-label-sm font-label-sm text-on-surface mb-1.5">
+              Role <span className="text-error">*</span>
+            </label>
+            <div className="relative">
+              <select
+                {...register("role")}
+                className={`w-full h-[38px] px-3 pr-8 rounded border ${errors.role ? 'border-error' : 'border-outline-variant'} bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 appearance-none transition-colors`}
+              >
+                <option value="EMPLOYEE">Employee</option>
+                <option value="OWNER">Owner</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-2.5 top-2.5 pointer-events-none text-on-surface-variant text-[18px]">expand_more</span>
+            </div>
+            {errors.role && <p className="text-error text-label-sm font-label-sm mt-1">{errors.role.message as string}</p>}
           </div>
 
           {!isEditing && role === "EMPLOYEE" && (
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted-text mb-2">Initial Branch</label>
-              <select
-                {...register("branchId")}
-                className="w-full rounded-xl border border-slate-200 bg-input-bg py-3 px-4 text-sm font-semibold text-dark-slate focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/15"
-              >
-                <option value="">Select a branch</option>
-                {branches.map((b: Branch) => (
-                  <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
-                ))}
-              </select>
-              {errors.branchId && <p className="text-red-500 text-xs mt-1">{errors.branchId.message as string}</p>}
+              <label className="block text-label-sm font-label-sm text-on-surface mb-1.5">
+                Initial Branch <span className="text-error">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  {...register("branchId")}
+                  className={`w-full h-[38px] px-3 pr-8 rounded border ${errors.branchId ? 'border-error' : 'border-outline-variant'} bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 appearance-none transition-colors`}
+                >
+                  <option value="">Select a branch</option>
+                  {branches.map((b: Branch) => (
+                    <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined absolute right-2.5 top-2.5 pointer-events-none text-on-surface-variant text-[18px]">expand_more</span>
+              </div>
+              {errors.branchId && <p className="text-error text-label-sm font-label-sm mt-1">{errors.branchId.message as string}</p>}
             </div>
           )}
 
@@ -196,14 +210,14 @@ export function EmployeeFormModal({ isOpen, onClose, user }: EmployeeFormModalPr
             <button
               type="button"
               onClick={onClose}
-              className="py-3 px-6 rounded-xl font-bold text-sm text-slate-600 hover:bg-slate-100 transition-colors"
+              className="h-[38px] px-4 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-md text-label-md transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="py-3 px-6 rounded-xl bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-bold text-sm shadow-btn transition-all duration-150 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="h-[38px] px-4 rounded bg-primary hover:bg-primary-hover text-on-primary font-label-md text-label-md shadow-sm transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSubmitting ? "Saving..." : isEditing ? "Save Changes" : "Create Employee"}
             </button>

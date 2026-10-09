@@ -36,112 +36,105 @@ export function Login() {
   };
 
   return (
-    <div className="bg-warm-canvas min-h-screen text-dark-slate flex flex-col justify-between selection:bg-[#0047FF] selection:text-white antialiased">
-      <header className="w-full pt-8 pb-2 px-6 flex justify-center items-center"></header>
+    <div className="bg-surface min-h-screen text-on-surface flex flex-col justify-between selection:bg-primary selection:text-white antialiased">
+      {/* Top spacer */}
+      <div className="w-full pt-8 pb-2 px-6"></div>
 
+      {/* Main login area */}
       <main className="flex-grow flex items-center justify-center px-4 py-6">
-        <div className="w-full max-w-[460px]">
-          <div className="bg-white rounded-3xl p-8 sm:p-10 shadow-card border border-neutral-200/60 relative">
+        <div className="w-full max-w-[440px]">
+          {/* Login Card — styled like Owner Dashboard cards */}
+          <div className="bg-surface-container-lowest rounded-xl p-8 sm:p-10 border border-outline-variant shadow-sm relative">
             
+            {/* Logo — same Gelana emblem used in the sidebar brand header */}
             <div className="flex flex-col items-center justify-center mb-6">
-              <div className="p-2 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-neutral-100">
+              <div className="p-2.5 bg-surface-container-lowest rounded-xl flex items-center justify-center border border-outline-variant">
                 <img 
                   alt="Gelana Logo" 
-                  className="h-20 w-20 object-contain" 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrCz8TI1A3-WmdKOBQvk0udu5hvxEdTwtDZCU5bMzbqoJPYSidb1koE5LTZ5Z78FA-JfmDePDUroYdZJ9gyUnz0Usy52gaDcRQ-m7ZsBmpoe5MK0x4Zx5tdkIFxa1VeIqNxWZ9zPDZ12I02I7gKJIYoflJ3EjAewKeRfQROOSVgPYk2oqxjzZt4jl1_CtS7GtDJ4PLf9z834CkD7v8kzgWnbNta2P5o3A0Dvh-82GaoQ5OXsCYNCgWcodSZGerDxCY" 
+                  className="h-16 w-16 object-contain rounded" 
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDu6Zr8Gk5HIOVg__ITLmiHzUXJ0QouEIhyHgcos1hmSV1AXS9gD-vzZW0V8M9Wu4FWIlASLLIX0ztH8jREVntCu_sJg3BB-ZGCIMXsQVbXQY1Sr74WanQPYGundY4U3fpShEdX4llbEjWn6maw7Kk0pFsM0jLSlMxngiJQtgLKDLpIK1x0_6EMWk2g5CWSnIiqga8vAfcidFbdxMw5IGFqQJEwurgccDVy-xPULvj_oJaWyC4nwF-eN_3JKYdabUuW" 
                 />
               </div>
             </div>
 
+            {/* Title & Subtitle — same typography as dashboard headings */}
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold tracking-tight text-dark-slate sm:text-[26px]">
-                Inventory &amp; Sales Management
+              <h1 className="text-headline-lg font-headline-lg tracking-tight text-on-surface">
+                Gelana Management
               </h1>
-              <p className="text-sm text-muted-text mt-2 font-medium">
-                Internal business management system for 3 branches
+              <p className="text-body-sm font-body-sm text-on-surface-variant mt-1.5 font-medium">
+                Inventory &amp; Sales — Sign in to continue
               </p>
             </div>
 
+            {/* Login Form */}
             <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+              {/* Email field */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted-text mb-2" htmlFor="email">
+                <label className="block text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant mb-2" htmlFor="email">
                   Email
                 </label>
                 <div className="relative">
                   <input 
-                    className="w-full rounded-xl border border-slate-200 bg-input-bg py-3.5 px-4 pl-11 text-sm font-semibold text-dark-slate placeholder:text-slate-400 placeholder:font-normal focus:border-[#0047FF] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0047FF]/15 transition-all" 
+                    className="w-full rounded border border-outline-variant bg-surface py-3 px-4 pl-11 text-body-md font-body-md text-on-surface placeholder:text-outline-variant focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-[3px] focus:ring-primary/20 transition-all" 
                     id="email" 
                     placeholder="e.g. name@gelana.com" 
                     type="email"
                     {...register("email")}
                   />
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 pointer-events-none">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-                    </svg>
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-on-surface-variant pointer-events-none">
+                    <span className="material-symbols-outlined text-[20px]">mail</span>
                   </span>
                 </div>
-                {errors.email && <p className="text-red-500 text-xs mt-1 font-medium">{errors.email.message}</p>}
+                {errors.email && <p className="text-error text-xs mt-1.5 font-semibold">{errors.email.message}</p>}
               </div>
 
+              {/* Password field */}
               <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-text" htmlFor="password">
-                    Password
-                  </label>
-                </div>
+                <label className="block text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant mb-2" htmlFor="password">
+                  Password
+                </label>
                 <div className="relative">
                   <input 
-                    className="w-full rounded-xl border border-slate-200 bg-input-bg py-3.5 px-4 pl-11 pr-11 text-sm font-semibold text-dark-slate placeholder:text-slate-400 focus:border-[#0047FF] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0047FF]/15 tracking-wider transition-all" 
+                    className="w-full rounded border border-outline-variant bg-surface py-3 px-4 pl-11 pr-11 text-body-md font-body-md text-on-surface placeholder:text-outline-variant focus:border-primary focus:bg-surface-container-lowest focus:outline-none focus:ring-[3px] focus:ring-primary/20 tracking-wider transition-all" 
                     id="password" 
                     placeholder="••••••••••••" 
                     type={showPassword ? "text" : "password"}
                     {...register("password")}
                   />
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 pointer-events-none">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"></path>
-                    </svg>
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-on-surface-variant pointer-events-none">
+                    <span className="material-symbols-outlined text-[20px]">lock</span>
                   </span>
                   <button 
                     aria-label="Toggle password visibility" 
-                    className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-600 focus:outline-none" 
+                    className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-on-surface-variant hover:text-on-surface focus:outline-none transition-colors" 
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      {showPassword ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"></path>
-                      ) : (
-                        <>
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                        </>
-                      )}
-                    </svg>
+                    <span className="material-symbols-outlined text-[20px]">{showPassword ? 'visibility_off' : 'visibility'}</span>
                   </button>
                 </div>
-                {errors.password && <p className="text-red-500 text-xs mt-1 font-medium">{errors.password.message}</p>}
+                {errors.password && <p className="text-error text-xs mt-1.5 font-semibold">{errors.password.message}</p>}
               </div>
 
+              {/* Submit */}
               <div className="pt-1">
                 {mutation.error && (
-                  <div role="alert" className="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-lg flex items-center justify-center">
-                    <p className="text-xs text-red-600 font-semibold text-center leading-tight">
+                  <div role="alert" className="mb-3 px-3 py-2.5 bg-error-container border border-error-container rounded flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-error shrink-0">error</span>
+                    <p className="text-xs text-error font-semibold text-center leading-tight">
                       {(mutation.error as any).message || "Login failed"}
                     </p>
                   </div>
                 )}
                 <button 
-                  className="w-full py-4 px-6 rounded-xl bg-[#0047FF] hover:bg-[#0037C7] active:scale-[0.99] text-white font-bold text-sm shadow-btn transition-all duration-150 flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed" 
+                  className="w-full py-3.5 px-6 rounded bg-primary hover:bg-primary-hover hover:translate-y-[-1px] active:translate-y-0 text-on-primary font-bold text-label-md shadow-sm transition-all duration-150 flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none" 
                   type="submit"
                   disabled={mutation.isPending}
                 >
                   <span>{mutation.isPending ? "Signing in..." : "Sign In"}</span>
                   {!mutation.isPending && (
-                    <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
-                    </svg>
+                    <span className="material-symbols-outlined text-[20px] transition-transform group-hover:translate-x-1">arrow_forward</span>
                   )}
                 </button>
               </div>
@@ -150,10 +143,11 @@ export function Login() {
         </div>
       </main>
 
+      {/* Footer status */}
       <footer className="w-full pb-8 pt-4 px-6 flex justify-center items-center">
-        <div className="inline-flex items-center gap-2 bg-white/90 border border-neutral-200/70 px-4 py-2 rounded-full shadow-sm">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span className="text-xs font-semibold text-dark-slate">System Status: <span className="text-emerald-600 font-bold">Online</span></span>
+        <div className="inline-flex items-center gap-2 bg-surface-container-lowest border border-outline-variant px-3 py-1.5 rounded-full shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+          <span className="text-xs font-semibold text-on-surface-variant">System Status: <span className="text-success font-bold">Online</span></span>
         </div>
       </footer>
     </div>

@@ -69,43 +69,41 @@ export function Catalog() {
   };
 
   if (isCatsLoading || isProdsLoading) {
-    return <div className="p-8 text-center text-muted-text">Loading catalog...</div>;
+    return <div className="p-8 text-center text-on-surface-variant font-body-md">Loading catalog...</div>;
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto">
-      <div className="flex justify-between items-end mb-8">
+    <>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-space-lg">
         <div>
-          <h1 className="text-3xl font-bold text-dark-slate mb-2">Product Catalog</h1>
-          <p className="text-muted-text text-sm font-medium">Manage catalog items, base & alternate selling units, and multi-branch stock availability.</p>
+          <h1 className="text-headline-lg font-headline-lg text-on-surface tracking-tight">Product Catalog</h1>
+          <p className="text-body-md font-body-md text-on-surface-variant mt-1">
+            Manage catalog items, base & alternate selling units, and multi-branch stock availability.
+          </p>
         </div>
         <div className="flex gap-3">
           {isOwner && (
             <>
               <button
                 onClick={() => setView(view === "products" ? "categories" : "products")}
-                className="py-3 px-6 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold shadow-sm transition-all duration-150"
+                className="inline-flex items-center gap-2 px-3.5 py-2 text-label-md font-label-md rounded border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container transition-colors shadow-sm"
               >
                 {view === "products" ? "Manage Categories" : "Back to Products"}
               </button>
               {view === "categories" ? (
                 <button
                   onClick={handleAddCat}
-                  className="py-3 px-6 rounded-xl bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-bold text-sm shadow-btn transition-all duration-150 flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 text-label-md font-label-md rounded bg-primary text-on-primary hover:bg-primary-hover transition-colors shadow-sm"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                  </svg>
+                  <span className="material-symbols-outlined text-[18px]">add</span>
                   Add Category
                 </button>
               ) : (
                 <button
                   onClick={handleAddProd}
-                  className="py-3 px-6 rounded-xl bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-bold text-sm shadow-btn transition-all duration-150 flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 text-label-md font-label-md rounded bg-primary text-on-primary hover:bg-primary-hover transition-colors shadow-sm"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                  </svg>
+                  <span className="material-symbols-outlined text-[18px]">add</span>
                   Add Product
                 </button>
               )}
@@ -114,52 +112,51 @@ export function Catalog() {
         </div>
       </div>
 
-      <div className="mb-6">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+      <div className="mb-4">
+        <span className="text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant">
           {view === "products" ? "Products" : "Categories"}
         </span>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-card border border-neutral-200/60 overflow-hidden mb-12">
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden mb-12">
         <div className="overflow-x-auto">
           {view === "categories" ? (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Category Name</th>
-                  <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Status</th>
+                <tr className="bg-surface border-b border-outline-variant">
+                  <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Category Name</th>
+                  <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Status</th>
                   {isOwner && (
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text text-right">Actions</th>
+                    <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle text-right">Actions</th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant text-body-md font-body-md">
                 {categories?.map((category: Category) => (
-                  <tr key={category.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-4 px-6">
-                      <span className="font-bold text-dark-slate">{category.name}</span>
+                  <tr key={category.id} className="hover:bg-surface transition-colors">
+                    <td className="py-3.5 px-4 font-semibold text-on-surface">
+                      {category.name}
                     </td>
-                    <td className="py-4 px-6">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                        category.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                    <td className="py-3.5 px-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-label-sm font-semibold ${
+                        category.isActive ? 'bg-success-container text-success' : 'bg-surface-container-low text-on-surface-variant'
                       }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${category.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                         {category.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     {isOwner && (
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-3">
                           <button
                             onClick={() => handleEditCat(category)}
-                            className="text-sm font-bold text-primary hover:text-primary-hover"
+                            className="text-label-sm font-label-sm text-primary hover:text-primary-hover"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleToggleCatStatus(category)}
                             disabled={statusMutation.isPending}
-                            className={`text-sm font-bold ${category.isActive ? 'text-red-600 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700'}`}
+                            className={`text-label-sm font-label-sm ${category.isActive ? 'text-error hover:text-red-700' : 'text-success hover:text-emerald-700'}`}
                           >
                             {category.isActive ? 'Deactivate' : 'Reactivate'}
                           </button>
@@ -170,7 +167,7 @@ export function Catalog() {
                 ))}
                 {(!categories || categories.length === 0) && (
                   <tr>
-                    <td colSpan={isOwner ? 3 : 2} className="py-8 text-center text-muted-text text-sm">
+                    <td colSpan={isOwner ? 3 : 2} className="py-8 text-center text-on-surface-variant">
                       No categories found.
                     </td>
                   </tr>
@@ -180,63 +177,62 @@ export function Catalog() {
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">SKU</th>
-                  <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Product</th>
-                  <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Category</th>
-                  <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Price / Unit</th>
-                  <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Status</th>
+                <tr className="bg-surface border-b border-outline-variant">
+                  <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">SKU</th>
+                  <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Product</th>
+                  <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Category</th>
+                  <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Price / Unit</th>
+                  <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Status</th>
                   {isOwner && (
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text text-right">Actions</th>
+                    <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle text-right">Actions</th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant text-body-md font-body-md">
                 {products?.map((product: Product) => (
-                  <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-4 px-6">
-                      <span className="font-mono text-sm text-slate-500 font-medium">{product.sku}</span>
+                  <tr key={product.id} className="hover:bg-surface transition-colors">
+                    <td className="py-3.5 px-4">
+                      <span className="font-mono text-label-sm font-label-sm text-on-surface-variant">{product.sku}</span>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-3.5 px-4">
                       <div className="flex flex-col">
-                        <span className="font-bold text-dark-slate">{product.name}</span>
-                        {product.brand && <span className="text-xs text-muted-text">{product.brand}</span>}
+                        <span className="font-semibold text-on-surface">{product.name}</span>
+                        {product.brand && <span className="text-[11px] text-on-surface-variant">{product.brand}</span>}
                       </div>
                     </td>
-                    <td className="py-4 px-6">
-                      <span className="text-sm font-medium text-slate-600">{product.categoryName}</span>
+                    <td className="py-3.5 px-4">
+                      <span className="text-on-surface-variant">{product.categoryName}</span>
                     </td>
-                    <td className="py-4 px-6">
-                      <span className="text-sm font-bold text-slate-800">${Number(product.defaultSellingPrice).toFixed(2)}</span>
-                      <span className="text-xs text-muted-text ml-1">/ {product.unit}</span>
+                    <td className="py-3.5 px-4">
+                      <span className="font-bold text-on-surface">${Number(product.defaultSellingPrice).toFixed(2)}</span>
+                      <span className="text-[11px] text-on-surface-variant ml-1">/ {product.unit}</span>
                     </td>
-                    <td className="py-4 px-6">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                        product.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                    <td className="py-3.5 px-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-label-sm font-semibold ${
+                        product.isActive ? 'bg-success-container text-success' : 'bg-surface-container-low text-on-surface-variant'
                       }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${product.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                         {product.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     {isOwner && (
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-3">
                           <button
                             onClick={() => handleManageUnits(product)}
-                            className="text-sm font-bold text-slate-600 hover:text-slate-800"
+                            className="text-label-sm font-label-sm text-on-surface-variant hover:text-on-surface"
                           >
                             Units
                           </button>
                           <button
                             onClick={() => handleEditProd(product)}
-                            className="text-sm font-bold text-primary hover:text-primary-hover"
+                            className="text-label-sm font-label-sm text-primary hover:text-primary-hover"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleToggleProdStatus(product)}
                             disabled={productStatusMutation.isPending}
-                            className={`text-sm font-bold ${product.isActive ? 'text-red-600 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700'}`}
+                            className={`text-label-sm font-label-sm ${product.isActive ? 'text-error hover:text-red-700' : 'text-success hover:text-emerald-700'}`}
                           >
                             {product.isActive ? 'Deactivate' : 'Reactivate'}
                           </button>
@@ -247,7 +243,7 @@ export function Catalog() {
                 ))}
                 {(!products || products.length === 0) && (
                   <tr>
-                    <td colSpan={isOwner ? 6 : 5} className="py-8 text-center text-muted-text text-sm">
+                    <td colSpan={isOwner ? 6 : 5} className="py-8 text-center text-on-surface-variant">
                       No products found.
                     </td>
                   </tr>
@@ -273,6 +269,6 @@ export function Catalog() {
         onClose={() => setIsUnitsModalOpen(false)}
         product={selectedProductForUnits}
       />
-    </div>
+    </>
   );
 }
