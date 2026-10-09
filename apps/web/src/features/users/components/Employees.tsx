@@ -49,77 +49,74 @@ export function Employees() {
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto">
-      <div className="flex justify-between items-end mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-dark-slate mb-2">Employees</h1>
-          <p className="text-muted-text text-sm font-medium">Manage branch staff and system access</p>
-        </div>
+    <div>
+      <div className="flex justify-between items-center mb-space-md">
+        <h2 className="text-headline-sm font-headline-sm text-on-surface">Employee List</h2>
         <button
           onClick={handleAdd}
-          className="py-3 px-6 rounded-xl bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-bold text-sm shadow-btn transition-all duration-150 flex items-center gap-2"
+          className="inline-flex items-center gap-2 px-4 py-2 text-label-md font-label-md rounded bg-primary text-on-primary hover:bg-primary-hover transition-colors shadow-sm"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
+          <span className="material-symbols-outlined text-[18px]">add</span>
           Add Employee
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-card border border-neutral-200/60 overflow-hidden">
+      <div className="bg-surface-container-lowest border border-outline-variant shadow-sm rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Name</th>
-                <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Email</th>
-                <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Role</th>
-                <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Branch</th>
-                <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text">Status</th>
-                <th className="py-4 px-6 text-xs font-bold uppercase tracking-wider text-muted-text text-right">Actions</th>
+              <tr className="bg-surface border-b border-outline-variant">
+                <th className="py-3 px-4 text-label-sm font-label-sm text-on-surface-subtle uppercase tracking-wider">Name</th>
+                <th className="py-3 px-4 text-label-sm font-label-sm text-on-surface-subtle uppercase tracking-wider">Email</th>
+                <th className="py-3 px-4 text-label-sm font-label-sm text-on-surface-subtle uppercase tracking-wider">Role</th>
+                <th className="py-3 px-4 text-label-sm font-label-sm text-on-surface-subtle uppercase tracking-wider">Branch</th>
+                <th className="py-3 px-4 text-label-sm font-label-sm text-on-surface-subtle uppercase tracking-wider">Status</th>
+                <th className="py-3 px-4 text-label-sm font-label-sm text-on-surface-subtle uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {users?.map((user: User) => (
-                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="py-4 px-6">
-                    <span className="font-bold text-dark-slate">{user.name}</span>
+                <tr key={user.id} className="hover:bg-surface transition-colors">
+                  <td className="py-3 px-4">
+                    <span className="font-semibold text-on-surface text-body-md font-body-md">{user.name}</span>
                   </td>
-                  <td className="py-4 px-6 text-sm text-slate-600">{user.email}</td>
-                  <td className="py-4 px-6">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                      user.role === 'OWNER' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                  <td className="py-3 px-4 text-body-sm font-body-sm text-on-surface-variant">{user.email}</td>
+                  <td className="py-3 px-4">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                      user.role === 'OWNER' ? 'bg-primary-container text-on-primary-container' : 'bg-secondary-container text-on-secondary-container'
                     }`}>
                       {user.role}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-sm text-slate-600">{getBranchName(user.branchId)}</td>
-                  <td className="py-4 px-6">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                      user.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                  <td className="py-3 px-4 text-body-sm font-body-sm text-on-surface-variant">{getBranchName(user.branchId)}</td>
+                  <td className="py-3 px-4">
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                      user.isActive ? 'bg-success-container text-success' : 'bg-surface-container-high text-on-surface-variant'
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${user.isActive ? 'bg-success' : 'bg-outline'}`}></span>
                       {user.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-right">
-                    <div className="flex items-center justify-end gap-3">
+                  <td className="py-3 px-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleEdit(user)}
-                        className="text-sm font-bold text-primary hover:text-primary-hover"
+                        className="text-label-sm font-label-sm text-primary hover:text-primary-hover px-2 py-1 rounded hover:bg-primary/10 transition-colors"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleAssign(user)}
-                        className="text-sm font-bold text-primary hover:text-primary-hover"
+                        className="text-label-sm font-label-sm text-primary hover:text-primary-hover px-2 py-1 rounded hover:bg-primary/10 transition-colors"
                       >
                         Change Branch
                       </button>
                       <button
                         onClick={() => handleToggleStatus(user)}
                         disabled={statusMutation.isPending}
-                        className={`text-sm font-bold ${user.isActive ? 'text-red-600 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700'}`}
+                        className={`text-label-sm font-label-sm px-2 py-1 rounded transition-colors ${
+                          user.isActive ? 'text-error hover:text-error hover:bg-error-container/40' : 'text-success hover:text-success hover:bg-success-container/40'
+                        }`}
                       >
                         {user.isActive ? 'Deactivate' : 'Reactivate'}
                       </button>
@@ -129,7 +126,7 @@ export function Employees() {
               ))}
               {(!users || users.length === 0) && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-text text-sm">
+                  <td colSpan={6} className="py-8 text-center text-on-surface-variant text-body-md font-body-md">
                     No employees found.
                   </td>
                 </tr>

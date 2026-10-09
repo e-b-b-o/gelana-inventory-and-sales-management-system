@@ -13,15 +13,14 @@ type StockAdjustmentModalProps = {
 };
 
 // Simplified schemas to fetch options
-const fetchBranches = async () => fetchApi("/branches");
+import { useBranches } from "../../branches/api";
 const fetchProducts = async () => fetchApi("/products");
 
 export function StockAdjustmentModal({ isOpen, onClose, initialProductId }: StockAdjustmentModalProps) {
   const { mutateAsync: createAdjustment, isPending } = useCreateAdjustment();
   const [errorMsg, setErrorMsg] = useState("");
 
-  const { data: branchesResponse } = useQuery({ queryKey: ["branches"], queryFn: fetchBranches });
-  const branches = Array.isArray(branchesResponse) ? branchesResponse : branchesResponse?.data || [];
+  const { data: branches } = useBranches();
 
   const { data: productsResponse } = useQuery({ queryKey: ["products"], queryFn: fetchProducts });
   const products = Array.isArray(productsResponse) ? productsResponse : productsResponse?.data || [];
@@ -84,7 +83,7 @@ export function StockAdjustmentModal({ isOpen, onClose, initialProductId }: Stoc
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-dark-slate focus:border-primary outline-none"
               >
                 <option value="">Select a branch...</option>
-                {branches.map((b: any) => (
+                {branches?.map((b: any) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>

@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useInventoryBalances, useSubmitStocktake } from "../api";
-import { fetchApi } from "../../../lib/api";
 
-const fetchBranches = async () => fetchApi("/branches");
+import { useBranches } from "../../branches/api";
 
 export function StocktakePage() {
   const [branchId, setBranchId] = useState("");
@@ -11,8 +9,7 @@ export function StocktakePage() {
   const [reason, setReason] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   
-  const { data: branchesResponse } = useQuery({ queryKey: ["branches"], queryFn: fetchBranches });
-  const branches = Array.isArray(branchesResponse) ? branchesResponse : branchesResponse?.data || [];
+  const { data: branches } = useBranches();
 
   const { data, isLoading } = useInventoryBalances({ branchId });
   const balances = data?.data || [];
@@ -86,11 +83,11 @@ export function StocktakePage() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-[1400px] mx-auto min-h-screen flex flex-col gap-6">
-      <div className="flex items-start justify-between">
+    <>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-space-lg">
         <div>
-          <h1 className="text-2xl font-bold text-dark-slate tracking-tight">Stocktake</h1>
-          <p className="text-sm text-muted-text mt-1">Perform physical stock counts and automatically adjust inventory.</p>
+          <h1 className="text-headline-lg font-headline-lg text-on-surface tracking-tight">Stocktake</h1>
+          <p className="text-body-md font-body-md text-on-surface-variant mt-1">Perform physical stock counts and automatically adjust inventory.</p>
         </div>
       </div>
 
@@ -107,7 +104,7 @@ export function StocktakePage() {
               className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-dark-slate focus:border-primary outline-none"
             >
               <option value="">Select a branch...</option>
-              {branches.map((b: any) => (
+              {branches?.map((b: any) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
@@ -232,6 +229,6 @@ export function StocktakePage() {
         )}
 
       </div>
-    </div>
+    </>
   );
 }

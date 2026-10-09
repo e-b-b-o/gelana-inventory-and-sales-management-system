@@ -3,10 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { getMe } from "../../auth/api/auth";
 import { useInventoryMovements } from "../api";
 import { format } from "date-fns";
+import { useBranches, type Branch } from "../../branches/api";
 
 export function MovementsPage() {
   const { data: userResponse } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const isOwner = userResponse?.user?.role === "OWNER";
+  
+  const { data: branches = [] } = useBranches();
   
   const [branchId, setBranchId] = useState("");
   const [movementType, setMovementType] = useState("");
@@ -57,12 +60,12 @@ export function MovementsPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-[1400px] mx-auto min-h-screen flex flex-col gap-6">
+    <>
       {/* PAGE TITLE */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-space-lg">
         <div>
-          <h1 className="text-2xl font-bold text-dark-slate tracking-tight">Inventory Movements</h1>
-          <p className="text-sm text-muted-text mt-1">Audit log of all material changes to inventory across branches.</p>
+          <h1 className="text-headline-lg font-headline-lg text-on-surface tracking-tight">Inventory Movements</h1>
+          <p className="text-body-md font-body-md text-on-surface-variant mt-1">Audit log of all material changes to inventory across branches.</p>
         </div>
       </div>
 
@@ -78,7 +81,9 @@ export function MovementsPage() {
               disabled={!isOwner}
             >
               <option value="">{isOwner ? "All Branches" : "My Branch"}</option>
-              {/* If we had branches fetched, we'd list them here. The backend enforces branch scoping. */}
+              {branches.map((b: Branch) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
             </select>
           </div>
           
@@ -228,6 +233,6 @@ export function MovementsPage() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

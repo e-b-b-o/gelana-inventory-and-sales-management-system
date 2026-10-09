@@ -53,119 +53,110 @@ export function Suppliers() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-space-lg">
             <div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Suppliers</h1>
-              <p className="text-xs text-slate-500 mt-1">Manage suppliers, contacts, and related master data.</p>
+              <h1 className="text-headline-lg font-headline-lg text-on-surface tracking-tight">Suppliers</h1>
+              <p className="text-body-md font-body-md text-on-surface-variant mt-1">Manage suppliers, contacts, and related master data.</p>
             </div>
             
             {isOwner && (
               <div className="flex items-center gap-3 shrink-0">
                 <button
                   onClick={handleAdd}
-                  className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-md shadow-primary/20 flex items-center gap-2 transition"
+                  className="px-3.5 py-2 rounded bg-primary hover:bg-primary-hover text-on-primary text-label-md font-label-md shadow-sm flex items-center gap-2 transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                  </svg>
+                  <span className="material-symbols-outlined text-[18px]">add</span>
                   <span>Add Supplier</span>
                 </button>
               </div>
             )}
           </div>
 
-          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-soft-card overflow-hidden">
-            <div className="p-5 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-4 bg-white">
+          <section className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-outline-variant flex flex-wrap items-center justify-between gap-4 bg-surface">
               <div className="flex flex-wrap items-center gap-3 flex-1">
                 <div className="relative w-full max-w-xs">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[18px]">search</span>
                   </span>
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className="w-full pl-9 pr-3 py-2 bg-surface border border-outline-variant rounded text-body-md font-body-md text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-on-surface-subtle"
                     placeholder="Search by name or contact..."
                   />
                 </div>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="py-2 px-3 bg-surface border border-outline-variant rounded text-body-md font-body-md text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
                   <option value="">Status: All</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
-              <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
-                <span>Total <strong className="text-slate-800">{filteredSuppliers?.length || 0}</strong> suppliers</span>
+              <div className="flex items-center gap-3 text-label-sm font-label-sm text-on-surface-variant">
+                <span>Total <strong className="text-on-surface">{filteredSuppliers?.length || 0}</strong> suppliers</span>
               </div>
             </div>
 
             <div className="overflow-x-auto min-h-[400px]">
               {isLoading ? (
-                <div className="flex items-center justify-center h-48 text-slate-500">Loading...</div>
+                <div className="flex items-center justify-center h-48 text-on-surface-variant font-body-md">Loading...</div>
               ) : error ? (
-                <div className="flex items-center justify-center h-48 text-red-500">Failed to load suppliers</div>
+                <div className="flex items-center justify-center h-48 text-error font-body-md">Failed to load suppliers</div>
               ) : (
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3.5 px-5">Supplier Name</th>
-                      <th className="py-3.5 px-4">Contact Person</th>
-                      <th className="py-3.5 px-4">Phone</th>
-                      <th className="py-3.5 px-4 hidden md:table-cell">Address</th>
-                      <th className="py-3.5 px-4">Status</th>
+                    <tr className="bg-surface border-b border-outline-variant">
+                      <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Supplier Name</th>
+                      <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Contact Person</th>
+                      <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Phone</th>
+                      <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle hidden md:table-cell">Address</th>
+                      <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle">Status</th>
                       {isOwner && (
-                        <th className="py-3.5 px-5 text-right">Actions</th>
+                        <th className="py-3 px-4 text-label-sm font-label-sm uppercase tracking-wider text-on-surface-subtle text-right">Actions</th>
                       )}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
+                  <tbody className="divide-y divide-outline-variant text-body-md font-body-md">
                     {filteredSuppliers?.map(supplier => (
-                      <tr key={supplier.id} className="hover:bg-slate-50 transition group">
-                        <td className="py-4 px-5">
-                          <span className="font-bold text-slate-900 group-hover:text-primary transition">
-                            {supplier.name}
-                          </span>
+                      <tr key={supplier.id} className="hover:bg-surface transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-on-surface">
+                          {supplier.name}
                         </td>
-                        <td className="py-4 px-4 font-medium text-slate-700">
-                          {supplier.contactPerson || <span className="text-slate-400 italic">None</span>}
+                        <td className="py-3.5 px-4">
+                          {supplier.contactPerson || <span className="text-on-surface-subtle italic">None</span>}
                         </td>
-                        <td className="py-4 px-4 font-mono text-slate-600">
-                          {supplier.phone || <span className="text-slate-400 italic font-sans">None</span>}
+                        <td className="py-3.5 px-4 font-mono">
+                          {supplier.phone || <span className="text-on-surface-subtle italic font-sans">None</span>}
                         </td>
-                        <td className="py-4 px-4 text-slate-600 hidden md:table-cell max-w-[200px] truncate" title={supplier.address || ""}>
-                          {supplier.address || <span className="text-slate-400 italic">None</span>}
+                        <td className="py-3.5 px-4 hidden md:table-cell max-w-[200px] truncate" title={supplier.address || ""}>
+                          {supplier.address || <span className="text-on-surface-subtle italic">None</span>}
                         </td>
-                        <td className="py-4 px-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                            supplier.isActive
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-label-sm font-semibold ${
+                            supplier.isActive ? 'bg-success-container text-success' : 'bg-surface-container-low text-on-surface-variant'
                           }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${supplier.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                             {supplier.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         {isOwner && (
-                          <td className="py-4 px-5 text-right">
+                          <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-3">
                               <button
                                 onClick={() => handleEdit(supplier)}
-                                className="text-primary hover:text-primary-hover font-bold"
+                                className="text-label-sm font-label-sm text-primary hover:text-primary-hover"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleToggleStatus(supplier)}
                                 disabled={statusMutation.isPending}
-                                className={`font-bold ${supplier.isActive ? 'text-red-600 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700'}`}
+                                className={`text-label-sm font-label-sm ${supplier.isActive ? 'text-error hover:text-red-700' : 'text-success hover:text-emerald-700'}`}
                               >
                                 {supplier.isActive ? 'Deactivate' : 'Reactivate'}
                               </button>
@@ -176,7 +167,7 @@ export function Suppliers() {
                     ))}
                     {filteredSuppliers?.length === 0 && (
                       <tr>
-                        <td colSpan={isOwner ? 6 : 5} className="py-8 text-center text-slate-500 font-medium">
+                        <td colSpan={isOwner ? 6 : 5} className="py-8 text-center text-on-surface-variant font-body-md">
                           No suppliers found.
                         </td>
                       </tr>
@@ -191,6 +182,6 @@ export function Suppliers() {
         onClose={() => setIsModalOpen(false)}
         supplier={editingSupplier}
       />
-    </div>
+    </>
   );
 }

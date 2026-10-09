@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { getMe } from "../../auth/api/auth";
 import { useInventoryBalances } from "../api";
+import { useBranches } from "../../branches/api";
+import { useCategories } from "../../categories/api";
 import { InventoryDrawer } from "./InventoryDrawer";
 import { OpeningStockModal } from "./OpeningStockModal";
 import { DisposalModal } from "./DisposalModal";
@@ -9,8 +12,12 @@ import { DisposalModal } from "./DisposalModal";
 export function CurrentInventoryPage() {
   const { data: userResponse } = useQuery({ queryKey: ["me"], queryFn: getMe });
   const isOwner = userResponse?.user?.role === "OWNER";
+  const userBranchId = userResponse?.user?.branchId;
+  const navigate = useNavigate();
   
   const [search, setSearch] = useState("");
+  // Non-owners can only see their own branch, unless their branchId is null/undefined in which case they can't fetch anything safely anyway.
+  // We'll initialize branchId if they aren't owners.
   const [branchId, setBranchId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState("");
@@ -18,7 +25,13 @@ export function CurrentInventoryPage() {
   const [isOpeningStockModalOpen, setIsOpeningStockModalOpen] = useState(false);
   const [disposalProduct, setDisposalProduct] = useState<any>(null);
 
-  const { data, isLoading } = useInventoryBalances({ search, branchId, categoryId, status });
+  const { data: branchesData } = useBranches();
+  const { data: categoriesData } = useCategories();
+
+  // If not owner, enforce their branch
+  const effectiveBranchId = isOwner ? branchId : (userBranchId || branchId);
+
+  const { data, isLoading } = useInventoryBalances({ search, branchId: effectiveBranchId, categoryId, status });
   const balances = data?.data || [];
   
   const totalProducts = balances.length;
@@ -38,87 +51,100 @@ export function CurrentInventoryPage() {
   }, 0);
 
   return (
-    <div className="p-6 md:p-8 max-w-[1400px] mx-auto min-h-screen flex flex-col gap-6">
+    <>
       {/* PAGE TITLE */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-space-lg">
         <div>
-          <h1 className="text-2xl font-bold text-dark-slate tracking-tight">Current Inventory</h1>
-          <p className="text-sm text-muted-text mt-1">View current stock levels, availability, and branch-specific inventory across branches.</p>
+          <h1 className="text-headline-lg font-headline-lg text-on-surface tracking-tight">Current Inventory</h1>
+          <p className="text-body-md font-body-md text-on-surface-variant mt-1">
+            View current stock levels, availability, and branch-specific inventory.
+          </p>
         </div>
         {isOwner && (
-          <button 
-            onClick={() => setIsOpeningStockModalOpen(true)}
-            className="px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg shadow-sm hover:bg-primary-hover hover:shadow transition-all flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-            Add Opening Stock
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => setIsOpeningStockModalOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-label-md font-label-md rounded border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container transition-colors shadow-sm"
+            >
+              Add Opening Stock
+            </button>
+            <button 
+              onClick={() => navigate('/receivings/new')}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-label-md font-label-md rounded bg-primary text-on-primary hover:bg-primary-hover transition-colors shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              New Receiving
+            </button>
+          </div>
         )}
       </div>
 
       {/* KPI CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-between">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Products</span>
-          <div className="mt-2">
-            <div className="text-xl font-bold text-dark-slate">{totalProducts} Products</div>
-            <div className="text-[11px] text-muted-text mt-1">Tracked inventory items</div>
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-space-md mb-space-lg">
+        <div className="bg-surface-container-lowest border border-outline-variant p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between min-h-[24px]">
+            <span className="text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant">Total Products</span>
+            <span className="material-symbols-outlined text-[18px] text-on-surface-variant">inventory_2</span>
+          </div>
+          <div className="mt-3">
+            <div className="text-headline-sm font-headline-sm text-on-surface">{totalProducts}</div>
+            <div className="text-body-sm font-body-sm text-on-surface-variant mt-1">Tracked items</div>
           </div>
         </div>
         
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">In Stock</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+        <div className="bg-surface-container-lowest border border-outline-variant p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between min-h-[24px]">
+            <span className="text-label-sm font-label-sm uppercase tracking-wider text-success">In Stock</span>
+            <span className="material-symbols-outlined text-[18px] text-success">check_circle</span>
           </div>
-          <div className="mt-2">
-            <div className="text-xl font-bold text-dark-slate">{inStock} Products</div>
-            <div className="text-[11px] text-emerald-600 mt-1">Above minimum threshold</div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Low Stock</span>
-            <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-          </div>
-          <div className="mt-2">
-            <div className="text-xl font-bold text-amber-900">{lowStock} Products</div>
-            <div className="text-[11px] text-amber-700 mt-1">At or below branch minimum</div>
+          <div className="mt-3">
+            <div className="text-headline-sm font-headline-sm text-on-surface">{inStock}</div>
+            <div className="text-body-sm font-body-sm text-on-surface-variant mt-1">Above threshold</div>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Out of Stock</span>
-            <span className="w-2 h-2 rounded-full bg-red-600"></span>
+        <div className="bg-surface-container-lowest border border-outline-variant p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between min-h-[24px]">
+            <span className="text-label-sm font-label-sm uppercase tracking-wider text-warning">Low Stock</span>
+            <span className="material-symbols-outlined text-[18px] text-warning">warning</span>
           </div>
-          <div className="mt-2">
-            <div className="text-xl font-bold text-red-600">{outOfStock} Products</div>
-            <div className="text-[11px] text-muted-text mt-1">Zero sellable units</div>
+          <div className="mt-3">
+            <div className="text-headline-sm font-headline-sm text-on-surface">{lowStock}</div>
+            <div className="text-body-sm font-body-sm text-on-surface-variant mt-1">At or below min</div>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">Damaged Stock</span>
-            <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        <div className="bg-surface-container-lowest border border-outline-variant p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between min-h-[24px]">
+            <span className="text-label-sm font-label-sm uppercase tracking-wider text-error">Out of Stock</span>
+            <span className="material-symbols-outlined text-[18px] text-error">cancel</span>
           </div>
-          <div className="mt-2">
-            <div className="text-xl font-bold text-dark-slate">{damagedStock} Units</div>
-            <div className="text-[11px] text-muted-text mt-1">Segregated non-sellable</div>
+          <div className="mt-3">
+            <div className="text-headline-sm font-headline-sm text-error">{outOfStock}</div>
+            <div className="text-body-sm font-body-sm text-on-surface-variant mt-1">Zero sellable</div>
+          </div>
+        </div>
+
+        <div className="bg-surface-container-lowest border border-outline-variant p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between min-h-[24px]">
+            <span className="text-label-sm font-label-sm uppercase tracking-wider text-purple-600">Damaged</span>
+            <span className="material-symbols-outlined text-[18px] text-purple-600">broken_image</span>
+          </div>
+          <div className="mt-3">
+            <div className="text-headline-sm font-headline-sm text-on-surface">{damagedStock}</div>
+            <div className="text-body-sm font-body-sm text-on-surface-variant mt-1">Non-sellable units</div>
           </div>
         </div>
 
         {isOwner && (
-          <div className="bg-brand-warm border border-warm-border p-4 rounded-xl shadow-sm flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Valuation (WAC)</span>
-              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          <div className="bg-primary-container/20 border border-primary-container p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between min-h-[24px]">
+              <span className="text-label-sm font-label-sm uppercase tracking-wider text-on-surface">Valuation</span>
+              <span className="material-symbols-outlined text-[18px] text-primary">account_balance_wallet</span>
             </div>
-            <div className="mt-2">
-              <div className="text-xl font-bold text-slate-900">ETB {totalWacValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-              <div className="text-[11px] text-slate-600 mt-1">Owner Cost Valuation</div>
+            <div className="mt-3">
+              <div className="text-headline-sm font-headline-sm text-on-surface font-mono">ETB {totalWacValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              <div className="text-body-sm font-body-sm text-on-surface-variant mt-1">Owner Cost (WAC)</div>
             </div>
           </div>
         )}
@@ -126,8 +152,8 @@ export function CurrentInventoryPage() {
 
       {/* FILTER BAR */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
-          <div className="lg:col-span-5 relative">
+        <div className="flex flex-col lg:flex-row gap-3 items-center w-full">
+          <div className="relative w-full lg:flex-1 min-w-0">
             <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             <input 
               className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2.5 text-sm font-medium text-dark-slate placeholder:text-slate-400 focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary/20 outline-none transition-all" 
@@ -136,27 +162,32 @@ export function CurrentInventoryPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="lg:col-span-3">
+          <div className="w-full lg:w-[220px] shrink-0">
             <select 
               className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-dark-slate focus:border-primary outline-none cursor-pointer"
-              value={branchId}
+              value={isOwner ? branchId : effectiveBranchId}
               onChange={(e) => setBranchId(e.target.value)}
+              disabled={!isOwner}
             >
-              <option value="">All Branches</option>
-              {/* In a real app we'd fetch branches, here we leave it as string filter for backend */}
-              {isOwner ? null : <option disabled>Locked to your branch</option>}
+              {isOwner && <option value="">All Branches</option>}
+              {branchesData?.map((b: any) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
             </select>
           </div>
-          <div className="lg:col-span-3">
+          <div className="w-full lg:w-[220px] shrink-0">
             <select 
               className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-dark-slate focus:border-primary outline-none cursor-pointer"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
             >
               <option value="">All Categories</option>
+              {categoriesData?.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
             </select>
           </div>
-          <div className="lg:col-span-2">
+          <div className="w-full lg:w-[160px] shrink-0">
             <select 
               className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-dark-slate focus:border-primary outline-none cursor-pointer"
               value={status}
@@ -298,6 +329,6 @@ export function CurrentInventoryPage() {
           product={disposalProduct}
         />
       )}
-    </div>
+    </>
   );
 }
