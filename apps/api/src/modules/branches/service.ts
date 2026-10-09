@@ -15,7 +15,8 @@ export async function getAllBranches() {
       phoneNumber: branches.phoneNumber,
       isActive: branches.isActive,
     })
-    .from(branches);
+    .from(branches)
+    .orderBy(branches.createdAt);
 }
 
 export async function getBranchById(id: string) {

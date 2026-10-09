@@ -95,10 +95,17 @@ export class InventoryService {
           brand: p.brand,
           baseUnit: baseUnit?.name || "Unit",
           altUnit: altUnit?.name || null,
-          sellingPrice: activePrice?.price || "0",
+          sellingPrice: activePrice?.sellingPrice || "0",
           totalAvailable,
           totalDamaged,
           status: calculatedStatus,
+          units: p.units.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            isBase: u.isBase,
+            sellingPrice: u.prices?.[0]?.sellingPrice || "0",
+            conversionQuantity: u.conversions?.find((c: any) => !c.effectiveUntil)?.conversionQuantity ?? (u.isBase ? "1" : null)
+          })),
           balances: p.inventoryBalances.map((b: any) => ({
             branchId: b.branchId,
             branchName: b.branch?.name || b.branchId,

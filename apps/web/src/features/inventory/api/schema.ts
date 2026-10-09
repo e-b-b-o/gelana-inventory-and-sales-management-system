@@ -12,6 +12,13 @@ export const InventoryProductSchema = z.object({
   totalAvailable: z.number(),
   totalDamaged: z.number(),
   status: z.string(),
+  units: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    isBase: z.boolean(),
+    sellingPrice: z.string(),
+    conversionQuantity: z.string().nullable().optional()
+  })).optional(),
   balances: z.array(z.object({
     branchId: z.string(),
     branchName: z.string(),

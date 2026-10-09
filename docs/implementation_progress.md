@@ -465,3 +465,170 @@ Milestone 5 (Receiving) - Slice 5.1 (Receiving).
   - `vitest run apps/api/src/modules/inventory/` -> Passed (20/20 backend tests, including randomized PK safety fixes for concurrent Vitest runs).
 - **Browser Testing**: Intentionally skipped; left for the user.
 
+---
+
+## Milestone 5 — Receiving
+
+### Vertical Slice 5.1 — Receiving
+
+- **Status**: Completed (Pending Manual Verification)
+- **Completed Tasks**:
+  - `5.1-T01`: Database schema for `receivings` (header) and `receiving_items` (lines) created. Migration `0014_magical_rictor.sql` generated and applied successfully.
+  - `5.1-T02`: Backend API endpoints, service logic, and Zod schemas created. Transaction boundaries configured for bulk item insertion.
+  - `5.1-T03`: `ReceivingsService` explicitly calls `InventoryService.recordMovement` for each line item within a single Postgres transaction.
+  - `5.1-T04`: Backend comprehensively tested (`receivings.test.ts`) validating atomicity, cost preservation, and proper WAC recalculation using the `((CurrentQty*CurrentWAC)+(NewQty*NewUnitCost))/(CurrentQty+NewQty)` formula.
+  - `5.1-T05`: Created robust `NewReceivingPage.tsx` adhering to the Stitch design guidelines, allowing dynamic form additions and recalculations. Integrated via React Hook Form and Zod.
+  - `5.1-T06`: Validated that endpoints and the UI form are strictly restricted to `OWNER`.
+  - `5.1-T07`: Appended route `/receivings/new` and added "New Receiving" navigation link in `CurrentInventoryPage`.
+- **Implementation Highlights**:
+  - Treats the receiving process as a single atomic ledger transaction.
+  - Supplier logic (one supplier per receipt) enforced visually and strictly via the unified `supplierId` on the receiving header.
+  - Follows strict business rules (BR-041 to BR-049).
+- **Verification Performed**:
+  - `npm run typecheck --workspaces` -> Passed.
+  - `vitest run apps/api/src/modules/receivings` -> Passed.
+- **Browser Testing**: Intentionally skipped; left for the user.
+
+---
+
+### Vertical Slices 5.2 & 5.3 — Receiving History & Receiving Details
+
+- **Status**: Completed (Pending Manual Verification)
+- **Completed Tasks**:
+  - `5.2-T01`: `GET /receivings` endpoint implemented with pagination (`page`, `limit`) and filters (`branchId`, `supplierId`).
+  - `5.2-T02`: `ReceivingsPage.tsx` UI built matching the Gelana design system, displaying a paginated table of stock receipts.
+  - `5.3-T01`: `GET /receivings/:id` endpoint implemented fetching header and relationally joined `items`, `supplier`, and `branch`.
+  - `5.3-T02`: `ReceivingDetailsDrawer.tsx` read-only UI implemented to view individual receipt line-item details, quantities, and historical costs.
+  - `5.3-T03`: Added `Receivings` navigation link strictly limited to `OWNER`.
+- **Files Created/Modified**:
+  - `apps/api/src/modules/receivings/schema.ts` (Added query schemas)
+  - `apps/api/src/modules/receivings/service.ts` (Added `getReceivings`, `getReceivingDetails`)
+  - `apps/api/src/modules/receivings/controller.ts` & `routes.ts` (Controller binding and `OWNER` auth middleware)
+  - `apps/api/src/modules/receivings/receivings.test.ts` (Pagination, filtering, and detail endpoints tested)
+  - `apps/web/src/features/receivings/api/index.ts` (Frontend fetch logic and `useReceivings`/`useReceivingDetails` hooks)
+  - `apps/web/src/features/receivings/components/ReceivingsPage.tsx` & `ReceivingDetailsDrawer.tsx` (New UIs)
+  - `apps/web/src/app/router/index.tsx` & `Sidebar.tsx` (Routes and navigation logic)
+- **Implementation Highlights**:
+  - Details drawer enforces immutability; it is completely read-only.
+  - Backend strictly authorizes endpoints to `OWNER`. Employees cannot view receipt history.
+  - Avoided N+1 queries by eagerly joining related tables (`items`, `products`, `supplier`) in the Drizzle query.
+- **Verification Performed**:
+  - `npm run typecheck --workspaces` -> Passed.
+  - `npx vitest run apps/api/src/modules/receivings/receivings.test.ts` -> Passed successfully.
+- **Browser Testing**: Intentionally skipped; left for the user.
+
+---
+
+## Milestone 5 Status
+**Milestone 5 — Receiving** is now officially **COMPLETE**. The application can record new receiving transactions, update WAC, and view paginated histories and line-item details.
+
+---
+
+## Out-of-Band Task: UI Shell & Login Alignment (Stitch Design)
+
+- **Status**: Completed (Pending Manual Verification)
+- **Completed Tasks**:
+  - **Shared Authenticated Shell**: Replaced the temporary `AppShell.tsx` with a highly-polished two-pane shell (`AppShell.tsx`, `Sidebar.tsx`, `TopHeader.tsx`) matching the exact layout, dimensions, and typography of the approved Stitch non-login references (e.g., Owner Dashboard `271e695e4ce6406c94e7111277e0dbf9`).
+  - **Navigation**: Migrated all valid routing links into the new `Sidebar.tsx`, maintaining strict Owner/Employee visibility rules, active/inactive highlighting, and using SVG icons for visual hierarchy.
+  - **Page Backgrounds**: Enforced the correct `#F8FAFC` (`bg-slate-50`) background onto the application root wrapper so all authenticated pages inherit the proper canvas underlying the white content cards. Removed legacy inline custom CSS background tokens.
+  - **Login Page Redesign**: Explicitly abandoned the dedicated Stitch login styling in favor of extending the *Owner Dashboard design language* to the login screen. It now uses the `#F8FAFC` background, standard `#E2E8F0` borders, `rounded-lg` inputs, and standard primary buttons, making it visually cohesive with the main application shell. Preserved all auth logic and error handling.
+  - **Header and Navigation Fixes**: Removed the fake online/sync indicator from the Header. Combined the Branches and Employees pages into a shared "Users & Branches" management screen via `UsersBranchesLayout.tsx`.
+  - **Catalog and Suppliers Styling**: Migrated `Catalog.tsx`, `Suppliers.tsx`, and `SupplierFormModal.tsx` to strictly use the new design tokens, fixing non-compliant borders, colors, and layout structures.
+  - **Current Inventory Filters**: Hooked up the `useBranches` and `useCategories` APIs to the dropdown filters, allowing users to filter by real branch and category data. Correctly enforced access boundaries so `EMPLOYEE` accounts remain locked to their own branch.
+- **Verification Performed**:
+  - `npm run lint` & `npm run typecheck --workspaces` -> Passed successfully.
+  - `vitest run src/features/auth/components/Login.test.tsx` and `vitest run apps/web` -> Passed successfully.
+- **Browser Testing**: Intentionally skipped; left for the user.
+
+### UI Refinement (Round 3) - Fixes & 404 Page (Completed)
+- **Current Inventory Crash Fix**: Diagnosed and fixed the `TypeError: branchesData?.map is not a function` error. Root cause: Three separate modal/page components (`OpeningStockModal`, `StockAdjustmentModal`, `StocktakePage`) were making raw `useQuery({ queryKey: ["branches"] })` calls that skipped standard API response unwrapping, thereby poisoning the shared react-query cache with an object (`{ data: [...] }`) instead of an array. Refactored all components to strictly consume the `useBranches` hook.
+- **Users & Branches Redesign**: Restructured `UsersBranchesLayout.tsx` to act as a proper page header, removing duplicated page titles from `Employees.tsx` and `Branches.tsx`. Refactored the tables in both sub-pages to match the new `bg-surface-container-lowest` design system with correct typography, spacing, and button styles.
+- **Polished 404 Page**: Replaced the default/generic missing page behavior with a custom `NotFoundPage.tsx` styled to match the Gelana application shell. Added contextual routing logic to the "Back to Dashboard" button, directing users safely based on their authentication status.
+- **Verification Performed**: 
+  - Ran `npm run typecheck` in `apps/web` -> Passed successfully.
+  - Ran `npx vitest run apps/web` -> Passed successfully (6/6 tests passing).
+
+### UI Refinement (Round 4) - Spacing, Forms & Alignment (Completed)
+- **Standardized Content Spacing**: Aligned the outer wrapper boundaries for `CurrentInventoryPage`, `MovementsPage`, `StocktakePage`, `Suppliers`, and `NewReceivingPage` to uniformly utilize the Gelana design system's spacing (`mb-space-lg`, flex headers, etc.), matching the benchmark `Products & Categories` layout.
+- **Form Modal Redesign**: Redesigned `ProductFormModal` and `CategoryFormModal` to match the exact design system used in the rest of the application (e.g. `bg-surface-container-lowest`, `border-outline-variant`, correct button styles and label typography).
+- **KPI Card Alignment Fix**: Adjusted the 6 KPI Statistics cards on the `CurrentInventoryPage`. By standardizing the header of each card with `flex items-center justify-between min-h-[24px]`, the content below remains perfectly aligned across all varying icon heights and text layouts.
+- **Verification Performed**:
+  - `npm run typecheck` and `vitest` pass perfectly across the monorepo.
+
+### UI Refinement (Round 5) - Form Standardization, Movements Fix & Toolbar Polish (Completed)
+- **Employee Forms Redesign**: Upgraded `EmployeeFormModal.tsx` and `BranchAssignmentModal.tsx` to the new Gelana design system, retaining all form structure, validation, and permissions functionality.
+- **Branch Form Redesign**: Upgraded `BranchFormModal.tsx` similarly (inputs, typography, colors, and shadow-sm).
+- **Inventory Movements Branch Filter Fix**: Diagnosed and fixed the empty branch dropdown. The select input was statically commented out instead of fetching. Re-wired the data using `useBranches` to accurately respect backend-enforced branch access/scoping.
+- **Current Inventory Icons**: Normalized the 6 KPI cards in `CurrentInventoryPage`. Replaced CSS dots with accurate `material-symbols-outlined` (`inventory_2`, `check_circle`, `cancel`).
+- **Current Inventory Toolbar Alignment**: Adjusted the previously wrapping 13-column grid (`lg:grid-cols-12` containing `5+3+3+2`) to a safer responsive flexbox layout (`flex-col lg:flex-row`). Search input uses `flex-1 min-w-0`, allowing all filters to sit squarely on a single line at desktop resolutions without cramping.
+- **Verification Performed**:
+  - `npm run typecheck` and `vitest` run flawlessly with `0` errors.
+
+---
+
+## Milestone 6 — Sales
+
+### Vertical Slice 6.1 — New Sale
+
+- **Status**: Completed (Pending Manual Verification)
+- **Completed Tasks**:
+  - `6.1-T01`: Created `sales`, `sale_items`, and `sale_payments` database schemas along with PostgreSQL sequence for safe sale numbering. Included fields for `idempotencyKey` and preserved original entered quantities and unit UUIDs.
+  - `6.1-T02`: Implemented robust backend `SalesService.createSale` featuring database transactions, precise WAC snapshotting, idempotent retries, and strict monetary validation.
+  - `6.1-T03`: Atomically integrated with `InventoryService.recordMovement` to safely deduct inventory without duplicating logic.
+  - `6.1-T04`: Verified concurrency and rollback safety using exhaustive `sales.test.ts` testing suites. Tests simulate partial failure and negative stock rejection.
+  - `6.1-T05`: Created `NewSalePage.tsx` using the unified Gelana layout. Reused the `AppShell` layout grid and implemented a live shopping cart, branch-scoping, and real payment methods dropdown.
+  - `6.1-T06`: Configured routes and added "New Sale" to the sidebar, correctly authorized for Employee and Owner access.
+- **Verification Performed**:
+  - `npm run typecheck --workspaces` -> Passed.
+  - `vitest run src/modules/sales` -> Passed (3/3 tests).
+- **Browser Testing**: Intentionally skipped; left for the user.
+
+### Slice 6.1 Regression Fix — Zod conversionQuantity Schema & Branch Inventory Alignment
+
+- **Status**: Completed (Pending Manual Verification)
+- **Root Cause Diagnosed**:
+  - `product_unit_conversions.conversion_quantity` is defined as PostgreSQL `numeric(15, 4)`, which Drizzle ORM serializes as a JavaScript `string` to prevent floating-point precision loss.
+  - When unit information was added to `InventoryProductSchema` (`apps/web/src/features/inventory/api/schema.ts`), `conversionQuantity` was typed as `z.number().optional()`.
+  - When `getBalances` ran `GetBalancesResponseSchema.safeParse(data)`, it failed with `ZodError` at `data[i].units[j].conversionQuantity` (`Expected: number, Received: string`) on every product that possessed unit conversions.
+  - Because `getBalances` throws on `safeParse` failure, `useInventoryBalances` failed, causing the Inventory page to crash/stop showing products.
+  - On `NewSalePage.tsx`, an ad-hoc unvalidated `useInventory` hook was previously fetching raw `/inventory/balances` bypassing Zod, allowing products to render. However, stock displayed as `0` for products without stock in the selected branch, and the branch selection was not unified with the shared inventory hook.
+- **Tasks Completed**:
+  - Aligned the API contract: Updated `InventoryProductSchema` to explicitly type `conversionQuantity` as `z.string().nullable().optional()`, preserving decimal string precision without broad coercion.
+  - In `InventoryService.getBalances`, ensured `units` mapping returns string conversion factor (defaulting to `"1"` for base units when an explicit conversion row is missing, and string or `null` for alternate units).
+  - Added `.orderBy(branches.createdAt)` to `getAllBranches` to ensure deterministic branch ordering with the primary branch (`BRANCH-1`) consistently first.
+  - Refactored `NewSalePage.tsx` to consume the canonical `useInventoryBalances` hook, unifying schema validation and caching across both Inventory and Sales features.
+  - Added automated tests: `apps/web/src/features/inventory/api/schema.test.ts` (verifying Zod parsing of string, decimal, and null conversion quantities) and updated `apps/api/src/modules/inventory/inventory.test.ts` (verifying API serialization).
+- **Verification Performed**:
+  - `npm run typecheck` -> Passed with 0 errors.
+  - `npm run lint` -> Passed with 0 errors.
+  - `npx vitest run --root apps/web` -> Passed (3 test files, 10 tests passing).
+  - `node --env-file=apps/api/.env ./node_modules/.bin/vitest run apps/api/src/modules/inventory/inventory.test.ts` -> Passed (4/4 tests).
+  - `node --env-file=apps/api/.env ./node_modules/.bin/vitest run apps/api/src/modules/sales/sales.test.ts` -> Passed (3/3 tests).
+  - Real database validation check via `InventoryService.getBalances` parsed all 30 products successfully without error both with and without branch filters.
+
+### Development Dataset Simplification (Seed Data)
+
+- **Status**: Completed
+- **Tasks Completed**:
+  - Replaced the previously unstructured/excessive development database seeding script in `apps/api/src/database/seeds/index.ts`.
+  - Implemented a clean, deterministic dataset strictly adhering to limits: exactly 3 branches, 3 categories, and 6 products.
+  - Fully retained all Drizzle ORM constraints. The script safely truncates existing data utilizing `TRUNCATE TABLE ... CASCADE` instead of dropping tables or removing migrations.
+  - Sourced base unit and price configuration deterministically. Inserted opening `inventory_balances` values corresponding directly to the newly seeded records.
+- **Verification Performed**:
+  - Verified successful execution using `npm run db:seed`.
+
+### Vertical Slice 6.4 — Sales Payments
+
+- **Status**: Completed (Pending Manual Verification)
+- **Tasks Completed**:
+  - `6.4-T01`: Determined existing payment flow capabilities mapped in `sales/api` and `CreateSaleSchema` (`z.array(SalePaymentSchema)`). The backend `SalesService` already contained robust split payment processing functionality preventing sum mismatches.
+  - `6.4-T02`: Redesigned `NewSalePage.tsx` payment section to follow the "Payment Allocation" split payment UI paradigm documented in `docs/ui_design_reference.md`.
+  - `6.4-T03`: Implemented a dynamic payment rows manager in React state tracking an array of allocations.
+  - `6.4-T04`: Added live calculation of `Total Allocated` and `Remaining Due`, rejecting sale confirmation unless `Math.abs(remaining) < 0.01`.
+- **Files Modified**:
+  - `apps/web/src/features/sales/NewSalePage.tsx` (Rebuilt UI to support multi-line payment entries).
+- **Verification Performed**:
+  - `npm run typecheck --workspaces` -> Passed perfectly with 0 errors.
+  - `npx vitest run --root apps/web` -> Passed.
+  - `node --env-file=apps/api/.env ./node_modules/.bin/vitest run apps/api/src/modules/sales/sales.test.ts` -> Passed successfully.
+- **Browser Testing**: Intentionally skipped; left for the user.

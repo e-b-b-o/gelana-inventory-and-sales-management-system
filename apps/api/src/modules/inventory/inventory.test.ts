@@ -67,4 +67,59 @@ describe("InventoryService", () => {
 
     await expect(InventoryService.getBalances(query, mockEmployee)).rejects.toThrow("Forbidden");
   });
+
+  it("should properly serialize product units and conversionQuantity as strings", async () => {
+    const mockProductsData = [
+      {
+        id: "prod-1",
+        sku: "SKU-001",
+        name: "Test Pen",
+        brand: "Bic",
+        category: { name: "Stationery" },
+        units: [
+          {
+            id: "u-1",
+            name: "Piece",
+            isBase: true,
+            isActive: true,
+            prices: [{ sellingPrice: "10.00" }],
+            conversions: [], // No explicit conversion row, should default to "1" for base
+          },
+          {
+            id: "u-2",
+            name: "Pack",
+            isBase: false,
+            isActive: true,
+            prices: [{ sellingPrice: "100.00" }],
+            conversions: [{ conversionQuantity: "12.0000", effectiveUntil: null }],
+          },
+        ],
+        inventoryBalances: [
+          {
+            branchId: "branch-1",
+            branch: { name: "Branch 1" },
+            availableQuantity: 24,
+            damagedQuantity: 0,
+            minimumStockQuantity: 5,
+            wac: "7.5000",
+          },
+        ],
+      },
+    ];
+
+    (db.query.products.findMany as any).mockResolvedValueOnce(mockProductsData);
+
+    const result = await InventoryService.getBalances({ page: 1, limit: 50 }, mockOwner);
+
+    expect(result.data).toHaveLength(1);
+    const item = result.data[0];
+    expect(item).toBeDefined();
+    expect(item!.sellingPrice).toBe("10.00");
+    expect(item!.units).toHaveLength(2);
+    expect(item!.units[0].conversionQuantity).toBe("1");
+    expect(typeof item!.units[0].conversionQuantity).toBe("string");
+    expect(item!.units[1].conversionQuantity).toBe("12.0000");
+    expect(typeof item!.units[1].conversionQuantity).toBe("string");
+  });
 });
+
