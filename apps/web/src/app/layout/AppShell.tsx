@@ -31,12 +31,13 @@ export function AppShell() {
         <nav style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', fontWeight: 500 }}>
           <div>Dashboard</div>
           <div>Sales</div>
-          <div>Inventory</div>
+          <div><a href="/inventory" style={{ textDecoration: 'none', color: 'inherit' }}>Inventory</a></div>
+          <div><a href="/inventory/movements" style={{ textDecoration: 'none', color: 'inherit' }}>Inventory Movements</a></div>
           <div>Transfers</div>
           <div><a href="/catalog" style={{ textDecoration: 'none', color: 'inherit' }}>Products & Categories</a></div>
           {isOwner && (
             <>
-              <div>Suppliers</div>
+              <div><a href="/suppliers" style={{ textDecoration: 'none', color: 'inherit' }}>Suppliers</a></div>
             </>
           )}
           <div>Daily Closing</div>
@@ -49,7 +50,12 @@ export function AppShell() {
           )}
           <div>Notifications</div>
           {!isOwner && <div>Account / Security</div>}
-          {isOwner && <div>Settings</div>}
+          {isOwner && (
+            <>
+              <div>Settings</div>
+              <div><a href="/payment-methods" style={{ textDecoration: 'none', color: 'inherit' }}>Payment Methods</a></div>
+            </>
+          )}
         </nav>
         <div style={{ padding: '20px', borderTop: '1px solid var(--color-border)' }}>
           <div style={{ marginBottom: '4px', fontWeight: 600 }}>{user.name}</div>

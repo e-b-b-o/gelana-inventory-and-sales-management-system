@@ -204,3 +204,23 @@ export const useUpdateProductUnitStatus = (productId: string) => {
     },
   });
 };
+
+export interface ProductUnitPrice {
+  id: string;
+  productUnitId: string;
+  sellingPrice: string;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+}
+
+export const useProductUnitPrices = (productId: string, unitId: string) => {
+  return useQuery<ProductUnitPrice[]>({
+    queryKey: ["products", productId, "units", unitId, "prices"],
+    queryFn: async () => {
+      if (!productId || !unitId) return [];
+      const response = await fetchApi(`/products/${productId}/units/${unitId}/prices`);
+      return response as ProductUnitPrice[];
+    },
+    enabled: !!productId && !!unitId,
+  });
+};

@@ -8,6 +8,9 @@ import { Suppliers } from "../../features/suppliers/components/Suppliers";
 import { PaymentMethods } from "../../features/payment-methods/components/PaymentMethods";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "../../features/auth/api/auth";
+import { CurrentInventoryPage } from "../../features/inventory/components/CurrentInventoryPage";
+import { MovementsPage } from "../../features/inventory/components/MovementsPage";
+import { StocktakePage } from "../../features/inventory/components/StocktakePage";
 
 function ProtectedRoute() {
   const { data, isLoading } = useQuery({
@@ -81,6 +84,18 @@ export const router = createBrowserRouter([
           {
             path: "payment-methods",
             element: <PaymentMethods />
+          },
+          {
+            path: "inventory",
+            element: <CurrentInventoryPage />
+          },
+          {
+            path: "inventory/movements",
+            element: <MovementsPage />
+          },
+          {
+            path: "inventory/stocktake",
+            element: <StocktakePage />
           }
         ]
       }
