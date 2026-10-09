@@ -1,0 +1,1 @@
+ALTER TABLE "payment_methods" ADD COLUMN "details" varchar(500);
