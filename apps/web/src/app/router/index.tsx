@@ -2,15 +2,20 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { Login } from "../../features/auth/components/Login";
 import { AppShell } from "../layout/AppShell";
 import { Employees } from "../../features/users/components/Employees";
+import { UsersBranchesLayout } from "../../features/users/components/UsersBranchesLayout";
 import { Branches } from "../../features/branches/components/Branches";
 import { Catalog } from "../../features/categories/components/Catalog";
 import { Suppliers } from "../../features/suppliers/components/Suppliers";
 import { PaymentMethods } from "../../features/payment-methods/components/PaymentMethods";
+import { NewReceivingPage } from "../../features/receivings/components/NewReceivingPage";
+import { ReceivingsPage } from "../../features/receivings/components/ReceivingsPage";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "../../features/auth/api/auth";
 import { CurrentInventoryPage } from "../../features/inventory/components/CurrentInventoryPage";
 import { MovementsPage } from "../../features/inventory/components/MovementsPage";
 import { StocktakePage } from "../../features/inventory/components/StocktakePage";
+import { NotFoundPage } from "../pages/NotFoundPage";
+import { NewSalePage } from "../../features/sales/NewSalePage";
 
 function ProtectedRoute() {
   const { data, isLoading } = useQuery({
@@ -51,11 +56,12 @@ export const router = createBrowserRouter([
       {
         path: "/login",
         element: <Login />,
-      },
+      }
     ]
   },
   {
     element: <ProtectedRoute />,
+    errorElement: <NotFoundPage />,
     children: [
       {
         path: "/",
@@ -66,12 +72,13 @@ export const router = createBrowserRouter([
             element: <div><h1>Dashboard</h1><p>Welcome to Gelana Phase 1 Shell</p></div>
           },
           {
-            path: "employees",
-            element: <Employees />
-          },
-          {
-            path: "branches",
-            element: <Branches />
+            path: "users",
+            element: <UsersBranchesLayout />,
+            children: [
+              { index: true, element: <Navigate to="employees" replace /> },
+              { path: "employees", element: <Employees /> },
+              { path: "branches", element: <Branches /> }
+            ]
           },
           {
             path: "catalog",
@@ -96,9 +103,25 @@ export const router = createBrowserRouter([
           {
             path: "inventory/stocktake",
             element: <StocktakePage />
+          },
+          {
+            path: "receivings/new",
+            element: <NewReceivingPage />
+          },
+          {
+            path: "receivings",
+            element: <ReceivingsPage />
+          },
+          {
+            path: "sales/new",
+            element: <NewSalePage />
           }
         ]
       }
     ]
+  },
+  {
+    path: "*",
+    element: <NotFoundPage />
   }
 ]);

@@ -46,10 +46,10 @@ describe("AppShell and Routing behavior", () => {
     });
 
     expect(screen.queryByText("John Doe")).toBeTruthy();
-    expect(screen.queryByText("EMPLOYEE")).toBeTruthy();
+    expect(screen.queryByText("employee")).toBeTruthy();
     expect(screen.queryByText("Products & Categories")).toBeTruthy();
     expect(screen.queryByText("Suppliers")).toBeNull();
-    expect(screen.queryByText("Users")).toBeNull();
+    expect(screen.queryByText("Users & Branches")).toBeNull();
   });
 
   it("renders Owner navigation items for OWNER role", async () => {
@@ -76,7 +76,7 @@ describe("AppShell and Routing behavior", () => {
     });
 
     expect(screen.queryByText("Jane Boss")).toBeTruthy();
-    expect(screen.queryByText("OWNER")).toBeTruthy();
+    expect(screen.queryByText("owner")).toBeTruthy();
     expect(screen.queryByText("Products & Categories")).toBeTruthy();
   });
 });
