@@ -7,5 +7,7 @@ export * from "./productUnits.js";
 export * from "./productPrices.js";
 export * from "./suppliers.js";
 export * from "./paymentMethods.js";
+export * from "./receivings.js";
 export * from "./inventoryBalances.js";
 export * from "./inventoryMovements.js";
+export * from "./sales.js";
