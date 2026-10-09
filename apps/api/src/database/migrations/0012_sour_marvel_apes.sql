@@ -1,0 +1,1 @@
+ALTER TABLE "inventory_balances" ADD COLUMN "minimum_stock_quantity" integer DEFAULT 0 NOT NULL;
