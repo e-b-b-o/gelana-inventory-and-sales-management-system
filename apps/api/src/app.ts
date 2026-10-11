@@ -16,6 +16,8 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 
 import { salesRoutes } from "./modules/sales/routes.js";
+import { returnsRouter } from "./modules/returns/routes.js";
+import { transfersRouter } from "./modules/transfers/routes.js";
 
 export const app = express();
 
@@ -64,5 +66,7 @@ app.use("/api/v1/payment-methods", paymentMethodsRouter);
 app.use("/api/v1/receivings", receivingsRouter);
 app.use("/api/v1/inventory", inventoryRouter);
 app.use("/api/v1/sales", salesRoutes);
+app.use("/api/v1/returns", returnsRouter);
+app.use("/api/v1/transfers", transfersRouter);
 
 app.use(errorHandler);
