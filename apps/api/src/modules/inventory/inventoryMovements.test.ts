@@ -9,8 +9,10 @@ describe("Inventory Movements (recordMovement)", () => {
   let testProductId: string;
   let testUserId: string;
   let testCategoryId: string;
+  let extraBranchIds: string[] = [];
 
   beforeEach(async () => {
+    extraBranchIds = [];
     // Setup test data
     const uniqueSuffix = crypto.randomUUID();
     const [branch] = await db.insert(branches).values({
@@ -41,13 +43,17 @@ describe("Inventory Movements (recordMovement)", () => {
   });
 
   afterEach(async () => {
-    await db.delete(inventoryMovements);
-    await db.delete(inventoryBalances);
+    const allBranches = [testBranchId, ...extraBranchIds];
+    for (const bId of allBranches) {
+      await db.delete(inventoryMovements).where(eq(inventoryMovements.branchId, bId));
+      await db.delete(inventoryBalances).where(eq(inventoryBalances.branchId, bId));
+      await db.delete(branches).where(eq(branches.id, bId));
+    }
     await db.delete(products).where(eq(products.id, testProductId));
     await db.delete(categories).where(eq(categories.id, testCategoryId));
     await db.delete(users).where(eq(users.id, testUserId));
-    await db.delete(branches).where(eq(branches.id, testBranchId));
   });
+
 
   it("should create opening stock and establish WAC", async () => {
     const movement = await InventoryService.recordMovement({
@@ -172,6 +178,7 @@ describe("Inventory Movements (recordMovement)", () => {
       name: "Test Branch 2 " + Date.now(),
       code: "TB2-" + Date.now(),
     }).returning();
+    extraBranchIds.push(branch2!.id);
 
     await InventoryService.recordMovement({
       branchId: branch2!.id,

@@ -1,13 +1,14 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ReceivingsService } from "./service.js";
 import { db } from "../../config/database.js";
 import { users, branches, suppliers, products, categories, inventoryBalances, inventoryMovements } from "../../database/schema/index.js";
 import { receivings, receivingItems } from "../../database/schema/receivings.js";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 describe("ReceivingsService", () => {
   let branchId: string;
+  let branch2Id: string | null = null;
   let supplierId: string;
   let categoryId: string;
   let productId: string;
@@ -16,6 +17,7 @@ describe("ReceivingsService", () => {
   beforeEach(async () => {
     // Generate UUIDs
     branchId = crypto.randomUUID();
+    branch2Id = null;
     supplierId = crypto.randomUUID();
     categoryId = crypto.randomUUID();
     productId = crypto.randomUUID();
@@ -53,6 +55,30 @@ describe("ReceivingsService", () => {
       categoryId: categoryId,
     });
   });
+
+  afterEach(async () => {
+    const branchesToDelete = [branchId, branch2Id].filter(Boolean) as string[];
+    for (const bId of branchesToDelete) {
+      await db.delete(receivingItems).where(sql`receiving_id IN (SELECT id FROM receivings WHERE branch_id = ${bId})`);
+      await db.delete(receivings).where(eq(receivings.branchId, bId));
+      await db.delete(inventoryMovements).where(eq(inventoryMovements.branchId, bId));
+      await db.delete(inventoryBalances).where(eq(inventoryBalances.branchId, bId));
+      await db.delete(branches).where(eq(branches.id, bId));
+    }
+    if (productId) {
+      await db.delete(products).where(eq(products.id, productId));
+    }
+    if (categoryId) {
+      await db.delete(categories).where(eq(categories.id, categoryId));
+    }
+    if (supplierId) {
+      await db.delete(suppliers).where(eq(suppliers.id, supplierId));
+    }
+    if (userId) {
+      await db.delete(users).where(eq(users.id, userId));
+    }
+  });
+
 
   it("should create receiving, items, and update inventory WAC", async () => {
     // 1. Setup initial inventory balance with WAC 0
@@ -146,7 +172,7 @@ describe("ReceivingsService", () => {
     }, userId);
 
     // Create second receiving for different branch
-    const branch2Id = crypto.randomUUID();
+    branch2Id = crypto.randomUUID();
     await db.insert(branches).values({
       id: branch2Id,
       name: "Branch 2",

@@ -52,13 +52,14 @@ describe("Inventory - Adjustments", () => {
   });
 
   afterEach(async () => {
-    await db.delete(inventoryMovements);
-    await db.delete(inventoryBalances);
+    await db.delete(inventoryMovements).where(eq(inventoryMovements.branchId, testBranchId));
+    await db.delete(inventoryBalances).where(eq(inventoryBalances.branchId, testBranchId));
     await db.delete(products).where(eq(products.id, testProductId));
     await db.delete(categories).where(eq(categories.id, testCategoryId));
     await db.delete(users).where(eq(users.id, testUserId));
     await db.delete(branches).where(eq(branches.id, testBranchId));
   });
+
 
   it("should allow OWNER to make a positive adjustment", async () => {
     const ownerUser = { id: testUserId, role: "OWNER" };

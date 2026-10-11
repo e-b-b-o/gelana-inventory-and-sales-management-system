@@ -68,13 +68,14 @@ describe("Inventory - Stocktake", () => {
   });
 
   afterEach(async () => {
-    await db.delete(inventoryMovements);
-    await db.delete(inventoryBalances);
+    await db.delete(inventoryMovements).where(eq(inventoryMovements.branchId, testBranchId));
+    await db.delete(inventoryBalances).where(eq(inventoryBalances.branchId, testBranchId));
     await db.delete(products).where(eq(products.categoryId, testCategoryId));
     await db.delete(categories).where(eq(categories.id, testCategoryId));
     await db.delete(users).where(eq(users.id, testUserId));
     await db.delete(branches).where(eq(branches.id, testBranchId));
   });
+
 
   it("should create correct adjustment movements for variances", async () => {
     const ownerUser = { id: testUserId, role: "OWNER" };
