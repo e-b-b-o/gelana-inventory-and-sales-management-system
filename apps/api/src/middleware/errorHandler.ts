@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/errors.js";
+import { ZodError } from "zod";
 
 export const errorHandler = (
   err: Error,
@@ -7,6 +8,17 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction,
 ) => {
+  if (err instanceof ZodError) {
+    res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: err.issues?.[0]?.message || "Validation failed",
+        details: err.issues,
+      },
+    });
+    return;
+  }
+
   if (!(err instanceof AppError) || !err.isOperational) {
     console.error("Error caught in Middleware:", err);
   }

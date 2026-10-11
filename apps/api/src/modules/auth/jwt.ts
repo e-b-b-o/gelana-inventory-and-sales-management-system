@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 
 export interface JwtPayload {
   userId: string;
+  id?: string;
   role: string;
   branchId: string | null;
 }

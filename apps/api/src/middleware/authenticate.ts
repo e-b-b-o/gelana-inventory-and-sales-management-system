@@ -28,6 +28,7 @@ export const authenticate = async (
     }
 
     req.user = {
+      id: user.id,
       userId: user.id,
       role: user.role,
       branchId: user.branchId,
