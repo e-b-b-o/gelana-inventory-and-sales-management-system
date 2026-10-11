@@ -16,6 +16,15 @@ import { MovementsPage } from "../../features/inventory/components/MovementsPage
 import { StocktakePage } from "../../features/inventory/components/StocktakePage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { NewSalePage } from "../../features/sales/NewSalePage";
+import { SalesHistoryPage } from "../../features/sales/SalesHistoryPage";
+import { SaleDetailsPage } from "../../features/sales/SaleDetailsPage";
+import { ReturnsHistoryPage } from "../../features/returns/ReturnsHistoryPage";
+import { NewReturnPage } from "../../features/returns/NewReturnPage";
+import { ReturnDetailsPage } from "../../features/returns/ReturnDetailsPage";
+import { TransfersListPage } from "../../features/transfers/TransfersListPage";
+import { NewTransferPage } from "../../features/transfers/NewTransferPage";
+import { TransferDetailsPage } from "../../features/transfers/TransferDetailsPage";
+
 
 function ProtectedRoute() {
   const { data, isLoading } = useQuery({
@@ -49,7 +58,7 @@ function PublicRoute() {
   return <Outlet />;
 }
 
-export const router = createBrowserRouter([
+export const routes = [
   {
     element: <PublicRoute />,
     children: [
@@ -115,13 +124,49 @@ export const router = createBrowserRouter([
           {
             path: "sales/new",
             element: <NewSalePage />
+          },
+          {
+            path: "sales/returns/new",
+            element: <NewReturnPage />
+          },
+          {
+            path: "sales/returns",
+            element: <ReturnsHistoryPage />
+          },
+          {
+            path: "sales/returns/:id",
+            element: <ReturnDetailsPage />
+          },
+          {
+            path: "sales",
+            element: <SalesHistoryPage />
+          },
+          {
+            path: "sales/:id",
+            element: <SaleDetailsPage />
+          },
+          {
+            path: "transfers/new",
+            element: <NewTransferPage />
+          },
+          {
+            path: "transfers",
+            element: <TransfersListPage />
+          },
+          {
+            path: "transfers/:id",
+            element: <TransferDetailsPage />
           }
         ]
+
       }
     ]
   },
+
   {
     path: "*",
     element: <NotFoundPage />
   }
-]);
+];
+
+export const router = createBrowserRouter(routes);

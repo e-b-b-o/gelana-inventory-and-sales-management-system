@@ -1,9 +1,24 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   isOwner: boolean;
   logoutMutation: any;
   user: { name?: string; role?: string };
+}
+
+interface NavGroupItem {
+  to: string;
+  label: string;
+  icon: string;
+  badge?: React.ReactNode;
+  visible?: boolean;
+}
+
+interface NavGroupProps {
+  label: string;
+  icon: string;
+  items: NavGroupItem[];
 }
 
 export function Sidebar({ isOwner, logoutMutation, user }: SidebarProps) {
@@ -14,8 +29,8 @@ export function Sidebar({ isOwner, logoutMutation, user }: SidebarProps) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'U';
   };
 
-  const NavItem = ({ to, icon, label, badge }: { to: string, icon: string, label: string, badge?: React.ReactNode }) => {
-    const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
+  const NavItem = ({ to, icon, label, badge }: { to: string; icon: string; label: string; badge?: React.ReactNode }) => {
+    const isActive = location.pathname === to || (to !== '/' && (location.pathname === to || location.pathname.startsWith(to + "/")));
     return (
       <Link
         to={to}
@@ -25,7 +40,7 @@ export function Sidebar({ isOwner, logoutMutation, user }: SidebarProps) {
             : "text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface border-l-4 border-transparent"
         }`}
       >
-        <span className={`material-symbols-outlined ${isActive ? "fill text-primary" : ""}`} style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}>
+        <span className={`material-symbols-outlined text-[20px] ${isActive ? "fill text-primary" : ""}`} style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}>
           {icon}
         </span>
         <span className="text-label-md font-label-md">{label}</span>
@@ -33,6 +48,114 @@ export function Sidebar({ isOwner, logoutMutation, user }: SidebarProps) {
       </Link>
     );
   };
+
+  interface NavAccordionProps {
+    label: string;
+    icon: string;
+    visibleItems: NavGroupItem[];
+  }
+
+  const NavAccordion = ({ label, icon, visibleItems }: NavAccordionProps) => {
+    const isChildActive = (to: string) => {
+      if (location.pathname === to) return true;
+      if (location.pathname.startsWith(to + "/")) {
+        const hasMoreSpecific = visibleItems.some(
+          other =>
+            other.to !== to &&
+            other.to.length > to.length &&
+            (location.pathname === other.to || location.pathname.startsWith(other.to + "/"))
+        );
+        return !hasMoreSpecific;
+      }
+      return false;
+    };
+
+    const isGroupActive = visibleItems.some(item => isChildActive(item.to));
+    const [isExpanded, setIsExpanded] = useState<boolean>(() => isGroupActive);
+
+    useEffect(() => {
+      if (isGroupActive) {
+        setIsExpanded(true);
+      }
+    }, [isGroupActive]);
+
+    const groupId = `nav-group-${label.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+
+    return (
+      <div className="space-y-1">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(prev => !prev)}
+          aria-expanded={isExpanded}
+          aria-controls={groupId}
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded transition-all duration-150 ease-in-out cursor-pointer ${
+            isGroupActive
+              ? "bg-primary-fixed/40 text-primary font-semibold border-l-4 border-primary"
+              : "text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface border-l-4 border-transparent"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className={`material-symbols-outlined text-[20px] ${isGroupActive ? "fill text-primary" : ""}`}
+              style={isGroupActive ? { fontVariationSettings: "'FILL' 1" } : {}}
+            >
+              {icon}
+            </span>
+            <span className="text-label-md font-label-md">{label}</span>
+          </div>
+          <span
+            className={`material-symbols-outlined text-[18px] text-outline transition-transform duration-200 ${
+              isExpanded ? "rotate-180" : ""
+            }`}
+          >
+            expand_more
+          </span>
+        </button>
+
+        {isExpanded && (
+          <div id={groupId} role="region" aria-label={`${label} sub-navigation`} className="space-y-1 pl-3">
+            {visibleItems.map(item => {
+              const active = isChildActive(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`flex items-center gap-2.5 pl-6 pr-3 py-2 rounded transition-all duration-150 ease-in-out cursor-pointer ${
+                    active
+                      ? "bg-primary-fixed text-primary font-semibold border-l-4 border-primary"
+                      : "text-on-surface-variant font-normal hover:bg-surface-container hover:text-on-surface border-l-4 border-transparent"
+                  }`}
+                >
+                  <span
+                    className={`material-symbols-outlined text-[18px] ${active ? "fill text-primary" : "text-outline"}`}
+                    style={active ? { fontVariationSettings: "'FILL' 1" } : {}}
+                  >
+                    {item.icon}
+                  </span>
+                  <span className="text-label-md font-label-md">{item.label}</span>
+                  {item.badge && <div className="ml-auto">{item.badge}</div>}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const NavGroup = ({ label, icon, items }: NavGroupProps) => {
+    const visibleItems = items.filter(item => item.visible !== false);
+
+    if (visibleItems.length === 0) return null;
+
+    if (visibleItems.length === 1) {
+      const single = visibleItems[0];
+      return <NavItem to={single.to} label={label} icon={icon} badge={single.badge} />;
+    }
+
+    return <NavAccordion label={label} icon={icon} visibleItems={visibleItems} />;
+  };
+
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col justify-between bg-surface-container-lowest border-r border-outline-variant shadow-sm z-30 shrink-0">
@@ -53,13 +176,26 @@ export function Sidebar({ isOwner, logoutMutation, user }: SidebarProps) {
         {/* Navigation Tabs */}
         <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
           <NavItem to="/" label="Dashboard" icon="dashboard" />
-          <NavItem to="/sales" label="Sales History" icon="receipt_long" />
-          <NavItem to="/sales/new" label="New Sale" icon="add_shopping_cart" />
-          <NavItem to="/inventory" label="Inventory" icon="inventory_2" />
           
-          {isOwner && (
-            <NavItem to="/inventory/movements" label="Movements" icon="timeline" />
-          )}
+          <NavGroup
+            label="Sales"
+            icon="point_of_sale"
+            items={[
+              { to: "/sales/new", label: "New Sale", icon: "add_shopping_cart" },
+              { to: "/sales", label: "Sales History", icon: "receipt_long" },
+              { to: "/sales/returns", label: "Returns", icon: "assignment_return" },
+            ]}
+          />
+
+
+          <NavGroup
+            label="Inventory"
+            icon="inventory_2"
+            items={[
+              { to: "/inventory", label: "Current Inventory", icon: "inventory_2" },
+              { to: "/inventory/movements", label: "Movements", icon: "timeline", visible: isOwner },
+            ]}
+          />
 
           <NavItem to="/transfers" label="Transfers" icon="sync_alt" />
           <NavItem to="/catalog" label="Products & Categories" icon="category" />
@@ -87,6 +223,7 @@ export function Sidebar({ isOwner, logoutMutation, user }: SidebarProps) {
             <NavItem to="/settings" label="Settings" icon="settings" />
           )}
         </nav>
+
 
         {/* Owner Profile Snippet in Drawer Bottom */}
         <div className="pt-4 border-t border-outline-variant mt-2 flex items-center justify-between px-2">

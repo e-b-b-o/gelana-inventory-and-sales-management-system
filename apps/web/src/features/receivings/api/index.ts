@@ -30,13 +30,15 @@ export const useCreateReceiving = () => {
 
   return useMutation({
     mutationFn: createReceiving,
-    onSuccess: () => {
+    onSuccess: async () => {
       // Invalidate inventory balances
-      queryClient.invalidateQueries({ queryKey: ["inventory-balances"] });
-      // Invalidate movements
-      queryClient.invalidateQueries({ queryKey: ["inventory-movements"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventory", "balances"] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory", "movements"] }),
+      ]);
     },
   });
+
 };
 
 export type GetReceivingsQuery = {

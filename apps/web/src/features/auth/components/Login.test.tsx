@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+// @vitest-environment jsdom
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Login } from "./Login";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { login } from "../api/auth";
@@ -20,6 +21,10 @@ const createTestClient = () =>
 describe("Login Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   const renderComponent = () => {
