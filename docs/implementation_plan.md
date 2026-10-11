@@ -46,24 +46,26 @@ The project is built using incremental end-to-end vertical slices.
 
 ## 8. Milestone 6 — Sales
 
-### Slice 6.1 — New Sale
-### Slice 6.2 — Sales History
-### Slice 6.3 — Sale Details
-### Slice 6.4 — Sales Payments
-### Slice 6.5 — Discounts
+### Slice 6.1 — New Sale (Completed)
+### Slice 6.2 — Sales History (Completed)
+### Slice 6.3 — Sale Details (Completed)
+### Slice 6.4 — Sales Payments (Completed)
+### Slice 6.5 — Discounts (Completed)
+
 
 ## 9. Milestone 7 — Returns & Corrections
 
-### Slice 7.1 — Sales Returns
-### Slice 7.2 — Return Details
-### Slice 7.3 — Corrections / Voids
+### Slice 7.1 — Sales Returns (Completed)
+### Slice 7.2 — Return Details (Completed)
+### Slice 7.3 — Corrections / Voids (Completed)
+
 
 ## 10. Milestone 8 — Transfers
 
-### Slice 8.1 — Transfer Request
-### Slice 8.2 — Transfer Details
-### Slice 8.3 — Approval / Rejection
-### Slice 8.4 — Dispatch
+### Slice 8.1 — Transfer Request (Completed)
+### Slice 8.2 — Transfer Details (Completed)
+### Slice 8.3 — Approval / Rejection (Completed)
+### Slice 8.4 — Dispatch (Completed)
 ### Slice 8.5 — Receive
 ### Slice 8.6 — Discrepancy
 

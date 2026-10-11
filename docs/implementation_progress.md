@@ -632,3 +632,302 @@ Milestone 5 (Receiving) - Slice 5.1 (Receiving).
   - `npx vitest run --root apps/web` -> Passed.
   - `node --env-file=apps/api/.env ./node_modules/.bin/vitest run apps/api/src/modules/sales/sales.test.ts` -> Passed successfully.
 - **Browser Testing**: Intentionally skipped; left for the user.
+
+---
+
+## Seed Data Bloat Resolution, Inventory Refresh & Sidebar Navigation Verification
+
+- **Status**: Completed (Pending User Manual Verification)
+- **Root Cause of Seed Data Bloat Diagnosed**:
+  1. **Test Pollution**: Multiple backend integration tests (`sales.test.ts`, `receivings.test.ts`, `stocktake.test.ts`, `adjustments.test.ts`, `disposal.test.ts`, `inventoryMovements.test.ts`, `openingStock.test.ts`) were inserting mock rows directly into the shared local development database (`inventory_db`) on every test run without teardown cleanup. Over time and repeated test runs, dozens of branches ("Test Sales Branch"), categories ("Test Category <uuid>"), products ("Test Product"), payment methods, and users polluted the database.
+  2. **Un-scoped Global Deletions**: Conversely, `adjustments.test.ts`, `disposal.test.ts`, and `stocktake.test.ts` executed raw `await db.delete(inventoryBalances)` without a `WHERE` clause in `afterEach`, which indiscriminately wiped out seeded inventory balances across the entire database.
+  3. **Concurrency Deadlocks**: Vitest was running test files with full parallelism against a single shared PostgreSQL database instance, leading to concurrent table-level truncation and lock conflicts (`40P01` deadlock errors) when seeds or migration scripts interacted.
+- **Tasks & Fixes Completed**:
+  - **Deterministic Stationery Seed Dataset (`apps/api/src/database/seeds/index.ts`)**:
+    - Created fixed deterministic UUIDs (`SEED_IDS`) for all baseline entities.
+    - Standardized exactly 3 branches (`BRANCH-MAIN`, `BRANCH-DT`, `BRANCH-WH`), 3 stationery categories (Writing Supplies, Paper Products, Office Supplies), 6 stationery products (Hardcover Notebook, Ballpoint Pen, HB Wooden Pencil, A4 Printer Paper, Document Folder, Permanent Marker), 4 test accounts (`owner@gelana.com`, `owner@dev.local`, `employee@gelana.com`, `employee@dev.local`, all with password `password123`), 4 payment methods, 2 suppliers, and 18 initial inventory balance records.
+    - Made seeding idempotent: executes upserts on conflict, reconciles baseline balances, and prunes orphaned seed records without requiring destructive blind `TRUNCATE CASCADE`.
+  - **Test Isolation & Teardown Hardening**:
+    - Scoped `afterEach` teardown in `sales.test.ts`, `receivings.test.ts`, `adjustments.test.ts`, `disposal.test.ts`, `stocktake.test.ts`, `inventoryMovements.test.ts`, and `openingStock.test.ts` to strictly clean up only their own test-created entities and test branch IDs.
+    - Eliminated un-scoped `db.delete(inventoryBalances)` calls that were wiping baseline balances.
+    - Set `fileParallelism: false` in `vitest.config.ts` and `apps/api/vitest.config.ts` to ensure serialized integration test execution against PostgreSQL, preventing transaction lock deadlocks.
+  - **Automated Seed Tests (`apps/api/src/database/seeds/seeds.test.ts`)**:
+    - Added comprehensive automated test suite (7 tests) verifying exact counts (3 branches, 3 categories, 6 products), deterministic relationships, unit conversions, balances, and multi-run idempotency.
+  - **Sidebar Navigation Review (`apps/web/src/app/layout/Sidebar.tsx` & `Sidebar.test.tsx`)**:
+    - Verified expandable/collapsible Sales and Inventory navigation groups.
+    - Confirmed active highlighting matches exact route (`/sales/new` vs `/sales`) without false highlights.
+    - Verified role-based visibility: Owners see Movements and Inventory; Employees only see permitted routes.
+    - 3 automated tests passing in `Sidebar.test.tsx`.
+  - **Automatic Inventory Refresh Review (`apps/web/src/features/sales/api/index.ts`, `receivings/api/index.ts`, `salesApi.test.tsx`)**:
+    - Verified canonical TanStack Query keys are used consistently: `["inventory", "balances"]`, `["inventory", "movements"]`, `["sales"]`.
+    - Confirmed that successful sales and receivings invalidate these keys, triggering automatic UI refetch.
+    - Confirmed that failed transactions do not trigger invalidation or optimistic balance mutations.
+    - 2 automated tests passing in `salesApi.test.tsx`.
+- **Intended Seed Command**:
+  - `npm run db:seed --workspace=@gelana-inventory-and-sales-management-system/api` (or `npm run db:seed` from project root).
+- **Verified Database Counts (`inventory_db`)**:
+  - Branches: **3**
+  - Categories: **3**
+  - Products: **6**
+  - Users: **4**
+  - Payment Methods: **4**
+  - Suppliers: **2**
+  - Inventory Balances: **18**
+- **Automated Quality-Check Results**:
+  - API Vitest suite: 21 files passed, 103/103 tests passed.
+  - Web Vitest suite: 5 files passed, 15/15 tests passed.
+  - Typecheck (`npm run typecheck` across all workspaces): 0 errors.
+  - Lint (`npm run lint` across all workspaces): 0 errors.
+- **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
+
+---
+
+## Milestone 6 — Vertical Slice 6.5 (Discounts)
+
+- **Status**: Completed (Pending User Manual Verification)
+- **Completed Tasks**:
+  - `6.5-T01`: Extended `SaleItemSchema` with optional `lineDiscount` and `CreateSaleSchema` with optional `saleDiscount` in `apps/api/src/modules/sales/schema.ts`.
+  - `6.5-T02`: Implemented Owner-only discount authorization in `SalesService.createSale`. Enforced on the server that any non-owner (e.g. Employee) submitting `lineDiscount > 0` or `saleDiscount > 0` is rejected with `403 Forbidden` (`AppError("Only owners can apply discounts", 403)`).
+  - `6.5-T03`: Implemented deterministic monetary calculation rules and boundary validations:
+    - Server-derived active unit prices preserved.
+    - Gross line amount computed as `round2(quantity * derivedUnitPrice)`.
+    - Negative discounts rejected.
+    - Line discount exceeding gross line amount rejected.
+    - Net line amount computed as `grossLineAmount - lineDiscount`.
+    - Gross subtotal computed as sum of gross line amounts.
+    - Sale-level discount exceeding eligible net sale total rejected.
+    - Grand total computed as `grossSubtotal - sum(lineDiscount) - saleDiscount`.
+    - Payment allocation strictly validated to match final grand total down to 2 decimals.
+  - `6.5-T04`: Implemented deterministic proportional allocation of sale-level discount across items with remainder penny assigned to the line with the highest net amount.
+  - `6.5-T05`: Historical snapshot preservation:
+    - `sales`: `subtotal` (gross), `saleDiscount`, `grandTotal`.
+    - `sale_items`: `unitPrice` (original catalog snapshot), `unitCost` (WAC snapshot), `lineDiscount`, `lineTotal` (net of line discount), `apportionedSaleDiscount`.
+  - `6.5-T06`: Hardened idempotency checking: matching payloads return the original sale safely; mismatched payloads (different quantities, discounts, branches, or payments) are rejected with `409 Conflict`.
+  - `6.5-T07`: Updated `NewSalePage.tsx`:
+    - Discount controls (line discount per cart item and sale discount in summary) visible only to Owner.
+    - Real-time recalculation of gross subtotal, line discounts, sale discount, grand total, and payment allocation remaining due.
+    - Checkout prevented when discounts are invalid or remaining due is not zero.
+  - `6.5-T08`: Automated testing in `sales.test.ts` (10 tests) and `salesApi.test.tsx`:
+    - No-discount sales, line discounts, sale discounts, combined discounts, proportional remainder allocation, employee rejection, payment validation against discounted total, and idempotency conflicts.
+- **Verification Performed**:
+  - `npm run typecheck --workspaces` -> Passed (0 errors).
+  - `vitest run src/modules/sales/sales.test.ts` -> Passed (14/14 tests).
+  - `npx vitest run --root apps/web` -> Passed (17/17 tests).
+- **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
+
+---
+
+## Milestone 6 — Vertical Slice 6.2 (Sales History)
+
+- **Status**: Completed (Pending User Manual Verification)
+- **Completed Tasks**:
+  - `6.2-T01`: Implemented `GetSalesQuerySchema` in `apps/api/src/modules/sales/schema.ts` supporting `page`, `limit`, `branchId`, `employeeId`, `startDate`, `endDate`, and `search`.
+  - `6.2-T02`: Implemented `SalesService.getSales` with strict role-based data scoping:
+    - Employees are strictly restricted to their own sales (`sales.createdById = user.id`) and assigned branch (`sales.branchId = user.branchId`). Any client attempt to override branch or employee in query parameters is safely ignored/prevented.
+    - Owners have full cross-branch visibility and can filter by branch, employee, date range, and search.
+    - Pagination metadata returned (`total`, `page`, `limit`, `totalPages`).
+    - Multi-table relations loaded: `branch`, `createdBy`, `items` (with `product` and `unit`), and `payments` (with `paymentMethod`).
+  - `6.2-T03`: Added `GET /sales` route in `apps/api/src/modules/sales/routes.ts` protected by `authenticate` and `authorizeRole(["OWNER", "EMPLOYEE"])`.
+  - `6.2-T04`: Created `useSales` TanStack Query hook in `apps/web/src/features/sales/api/index.ts` with query caching under `["sales", query]`.
+  - `6.2-T05`: Implemented `SalesHistoryPage.tsx` using Gelana design system:
+    - Page header with action button linking to `/sales/new`.
+    - Toolbar with search by sale number, date range inputs, and Owner-only branch & employee selectors.
+    - Interactive table displaying Sale #, Date & Time, Branch & Staff (for Owner), Items count, Gross Subtotal, Discounts (highlighted in red when present), Final Grand Total, Payment Methods, and Completed status badge.
+    - Comprehensive loading, error, empty ("No sales records found" / "Create First Sale"), and paginated footer states.
+  - `6.2-T06`: Registered `/sales` route in `apps/web/src/app/router/index.tsx`.
+  - `6.2-T07`: Automated testing in `sales.test.ts` (4 integration tests) and `salesApi.test.tsx`:
+    - Listing sales with relations and pagination.
+    - Filtering by branchId for owner.
+    - Searching by saleNumber.
+    - Strict employee authorization and scoping isolation.
+    - Query hook execution with URL query parameter formatting.
+- **Verification Performed**:
+  - Monorepo `npm run typecheck` -> Passed (0 errors).
+  - Monorepo `npm run lint` -> Passed (0 errors).
+  - Monorepo test suites: 21 API test files (114/114 tests) and 5 Web test files (17/17 tests) passed.
+  - Development database check confirmed baseline dataset integrity (3 branches, 3 categories, 6 products, 4 users, 18 balances).
+- **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
+
+---
+
+## Milestone 6 — Vertical Slice 6.3 (Sale Details) & Sales UI Consistency Audit
+
+- **Status**: Completed (Pending User Manual Verification)
+- **Completed Tasks**:
+  - `6.3-T01`: Implemented `SalesService.getSaleById(id, user)` in `apps/api/src/modules/sales/service.ts`:
+    - Safely matches either sale UUID or human-readable `saleNumber`.
+    - Throws `404 Not Found` for nonexistent transactions.
+    - Enforces strict backend authorization: `OWNER` can access all sales; `EMPLOYEE` is strictly restricted to sales they created (`createdById === user.id`) in their assigned branch (`branchId === user.branchId`), rejecting cross-user/cross-branch access with `403 Forbidden`.
+    - Protects business cost privacy: strips/nullifies historical WAC snapshot `unitCost` for employees while preserving it for owners.
+    - Pure read operation: performs zero database mutations on inventory balances or sales records.
+  - `6.3-T02`: Implemented `SalesController.getSaleById` and registered `GET /sales/:id` in `apps/api/src/modules/sales/routes.ts` protected by `authenticate` and `authorizeRole(["OWNER", "EMPLOYEE"])`.
+  - `6.3-T03`: Created `getSaleDetails` and `useSaleDetails(id)` TanStack Query hook in `apps/web/src/features/sales/api/index.ts` with caching under `["sale-details", id]`.
+  - `6.3-T04`: Created `SaleDetailsDrawer.tsx` following the established Gelana drawer pattern:
+    - Slide-over drawer with backdrop blur, keyboard Escape listener, and accessible dialog markup.
+    - Sale metadata: human-readable sale number, date/time, branch, staff, and completed status badge.
+    - Line items table: product name, brand, SKU, sold unit, quantity, original unit price snapshot, line discount, apportioned discount, and net line total.
+    - Owner-only cost snapshot: WAC cost displayed only to owners.
+    - Financial summary: gross subtotal, line discounts, sale discount, total discounts, and grand total.
+    - Payment breakdown: allocated payment methods and amounts.
+    - Historical immutability note informing user that prices and units represent the transaction snapshot.
+    - Comprehensive loading and error states.
+  - `6.3-T05`: Created `SaleDetailsPage.tsx` and registered `/sales/:id` in `apps/web/src/app/router/index.tsx` for direct URL navigation.
+  - `6.3-T06`: **Sales UI Consistency Audit & Corrections**:
+    - **Sales History (`SalesHistoryPage.tsx`)**:
+      - Standardized page header to `text-headline-lg font-headline-lg text-on-surface tracking-tight` and subtitle `text-body-md font-body-md text-on-surface-variant mt-1` with `mb-space-lg`.
+      - Replaced non-standard action button with canonical primary button `inline-flex items-center gap-2 px-3.5 py-2 text-label-md font-label-md rounded bg-primary text-on-primary hover:bg-primary-hover shadow-sm`.
+      - Replaced raw inputs in filter toolbar with standard Gelana controls (`bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-dark-slate focus:border-primary outline-none`).
+      - Added search icon and filter summary indicator matching `CurrentInventoryPage` and `ReceivingsPage`.
+      - Replaced table styling with `bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm` and `bg-slate-50 border-b border-slate-200` headers.
+      - Integrated `SaleDetailsDrawer` opened on row click and "View Details" button click.
+    - **New Sale (`NewSalePage.tsx`)**:
+      - Added standardized page header bar with "Sales History" secondary button navigation.
+      - Standardized product catalog cards and search bar to match `CurrentInventoryPage` / `Catalog` tokens.
+      - Standardized right cart panel: header, item cards, quantity stepper, line discount inputs, grand total display, payment method selectors, and charge button (`bg-primary hover:bg-primary-hover text-on-primary rounded-lg font-bold`).
+  - `6.3-T07`: Automated Testing:
+    - Backend `apps/api/src/modules/sales/sales.test.ts`: Added 7 integration tests covering owner full access, lookup by saleNumber, employee access to own sale, employee unitCost stripping, employee rejection for other users' sales (403), employee rejection for other branches' sales (403), nonexistent sale (404), and pure read idempotency. (All 21 tests pass).
+    - Frontend `apps/web/src/features/sales/api/salesApi.test.tsx`: Added 3 tests covering `useSaleDetails` fetching, idle when id undefined, and error handling. (All 7 tests pass).
+- **Verification Performed**:
+  - Monorepo `npm run typecheck` -> Passed (0 errors across API and Web).
+  - Monorepo `npm run lint` -> Passed (0 errors across API and Web).
+  - Monorepo API test suite: 21 files passed, 121/121 tests passed.
+  - Monorepo Web test suite: 5 files passed, 20/20 tests passed.
+  - Database seed test suite: 7/7 tests passed.
+  - Baseline dataset integrity verified against PostgreSQL: 3 branches, 3 categories, 6 products, 4 users, 4 payment methods, 2 suppliers, 18 balances, 0 sales.
+- **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
+
+---
+
+## Milestone 7 — Returns & Corrections (Slices 7.1, 7.2, 7.3)
+
+- **Status**: Completed (Pending User Manual Verification)
+- **Completed Tasks**:
+  - **Database Migration & Schema**:
+    - Created `apps/api/src/database/schema/returns.ts`:
+      - `sales_returns`: `id`, `return_number` (`RET-XXXXXX` from sequence), `sale_id` (nullable for unlinked), `branch_id`, `created_by_id`, `refund_amount`, `refund_payment_method_id`, `status` ('COMPLETED'), `reason`, `is_unlinked`.
+      - `sales_return_items`: `id`, `return_id`, `sale_item_id`, `product_id`, `unit_id`, `entered_quantity`, `base_quantity`, `unit_price`, `condition` ('SELLABLE' | 'DAMAGED'), `refund_amount`.
+      - Sequence `return_number_seq`.
+    - Created `apps/api/src/database/schema/saleCorrections.ts`:
+      - `sale_corrections`: `id`, `sale_id`, `correction_type` ('VOID' | 'EDIT_NOTE'), `reason`, `created_by_id`, `previous_state`, `new_state`, `created_at`.
+    - Updated `apps/api/src/database/schema/sales.ts`: Added `status: varchar("status", { length: 50 }).notNull().default("COMPLETED")` and relations to `returns` and `corrections`.
+    - Generated and executed migration `0016_unknown_captain_cross.sql`.
+  - **Backend Implementation (Slice 7.1 — Sales Returns)**:
+    - Created `apps/api/src/modules/returns/` (`schema.ts`, `service.ts`, `controller.ts`, `routes.ts`).
+    - Validates returnable quantity against original sale (`enteredQuantity - alreadyReturnedQty`), preventing over-returns.
+    - Prevents returns against voided sales (`sale.status === 'VOIDED'`).
+    - Enforces role authorization: returns linked to a sale permitted for Owner (all branches) and Employee (assigned branch); unlinked returns strictly require `OWNER` authorization.
+    - Atomically updates inventory ledger:
+      - `condition === 'SELLABLE'`: records `RETURN_GOOD` movement, restoring `availableQuantity`.
+      - `condition === 'DAMAGED'`: records `RETURN_DAMAGED` movement, incrementing `damagedQuantity` without affecting sellable available stock.
+      - Returns do NOT alter historical Weighted Average Cost (`changesWac: false`).
+    - Mounted under `/api/v1/returns` (`POST /`, `GET /`, `GET /:id`).
+  - **Backend Implementation (Slice 7.3 — Corrections & Voids)**:
+    - Implemented `voidSale` in `apps/api/src/modules/sales/service.ts`:
+      - Restricted strictly to `OWNER` role (`403 Forbidden` for employees).
+      - Rejects voiding a sale with existing processed returns (`400 Bad Request`).
+      - Rejects voiding an already voided sale (`400 Bad Request`).
+      - Atomically updates `sales.status = 'VOIDED'`.
+      - Reverses inventory deductions via compensating `ADJUSTMENT` movement back to `availableQuantity` with reason `Void sale SAL-XXXX: [reason]`.
+      - Records immutable audit trail in `sale_corrections`.
+    - Implemented `correctSale` (amendment/note addition) and `getSaleCorrections`.
+    - Enriched `getSaleById` to include `returns` and `corrections` relations.
+    - Registered endpoints: `POST /sales/:id/void`, `POST /sales/:id/corrections`, `GET /sales/:id/corrections`.
+  - **Frontend Implementation (Slices 7.1, 7.2, 7.3)**:
+    - Created Returns API hooks in `apps/web/src/features/returns/api/index.ts`: `useCreateReturn`, `useReturns`, `useReturnDetails`.
+    - Added void and correction hooks in `apps/web/src/features/sales/api/index.ts`: `useVoidSale`, `useCorrectSale`, `useSaleCorrections`.
+    - Created `ReturnsHistoryPage.tsx` (`/sales/returns`):
+      - Search by return number, branch filter (owner), return type filter (Linked vs Unlinked), date range filters.
+      - Table with monospace return number, linked sale indicator, stock disposition pill badges (Sellable vs Damaged), refund amounts, and staff attribution.
+      - Pagination and drawer trigger.
+    - Created `NewReturnPage.tsx` (`/sales/returns/new`):
+      - Mode toggle: Linked Return (search sale, validate remaining returnable qty, select condition per row, auto refund math) vs Unlinked Return (owner-only, branch selection, product & unit selection from inventory balances).
+      - Real-time stock disposition summary (sellable units restocked vs damaged units quarantined).
+      - Mandatory reason textarea and refund payment method selector.
+    - Created `ReturnDetailsDrawer.tsx` and `ReturnDetailsPage.tsx` (`/sales/returns/:id`):
+      - Full audit details, link to original sale, returned items table with condition badges, and ledger guarantee notices.
+    - Enhanced `SaleDetailsDrawer.tsx` and `SaleDetailsPage.tsx`:
+      - Void status badges (`Completed` vs `VOIDED`).
+      - Void confirmation modal with mandatory reason prompt.
+      - Invalidation & disabled state when sale has processed returns.
+      - "Returns Processed Against this Sale" section.
+      - "Audit Log & Corrections" timeline.
+      - Add Amendment Note modal.
+    - Updated `Sidebar.tsx`: Added "Returns" link under the Sales navigation group.
+    - Registered routes in `apps/web/src/app/router/index.tsx`.
+  - **Automated Testing**:
+    - Backend: Created `apps/api/src/modules/returns/returns.test.ts` (6/6 tests passed).
+    - Backend: Updated `apps/api/src/modules/sales/sales.test.ts` (23/23 tests passed).
+    - Frontend: Created `apps/web/src/features/returns/api/returnsApi.test.tsx` (7/7 tests passed).
+    - Frontend: Created `apps/web/src/features/returns/NewReturnPage.test.tsx` (2/2 tests passed).
+    - Frontend: Verified `apps/web/src/features/sales/api/salesApi.test.tsx` (7/7 tests passed).
+    - Frontend: Verified `apps/web/src/app/layout/Sidebar.test.tsx` (3/3 tests passed).
+- **Bug Fixes (Post-Milestone 7 Verification)**:
+  - **Duplicate Breadcrumb Removed**: Removed the hardcoded in-page breadcrumb navigation (`Sales > Returns > New Return`) from `NewReturnPage.tsx`. Retained the global top navigation breadcrumb (`Header.tsx`). Standardized page header layout and action button (`Back to Returns`) using system typography and spacing tokens.
+  - **Linked Return Internal Error Fixed**:
+    - Root cause: `apps/api/src/middleware/authenticate.ts` populated `req.user` with `userId` without the alias `id`. At runtime, `ReturnsService.createReturn` evaluated `createdById: user.id`, resulting in `undefined`, which Drizzle converted to SQL `DEFAULT`. Because `created_by_id` has a strict `NOT NULL` foreign-key constraint on `sales_returns`, PostgreSQL rejected the write with a constraint violation.
+    - Resolution: Updated `apps/api/src/modules/auth/jwt.ts` (`JwtPayload`) and `authenticate.ts` to expose both `id` and `userId`. In `ReturnsService.createReturn`, added defensive fallback `const createdById = user.id || user.userId`. Handled `ZodError` in `errorHandler.ts` to return HTTP 400 Bad Request with structured issues instead of 500.
+    - Added automated tests verifying Owner linked returns under auth-token session shape and verifying transactional rollback on failed mutations.
+- **Verification Performed**:
+  - Monorepo `npm run typecheck` -> Passed (0 errors across API and Web).
+  - Monorepo `npm run lint` -> Passed (0 errors across API and Web).
+  - Monorepo `npm test` -> Passed (25 test files, 136 / 136 tests passed).
+  - Database baseline check: `branches: 3, categories: 3, products: 6, users: 4, payment_methods: 4, suppliers: 2, inventory_balances: 18, sales: 0, sales_returns: 0, sale_corrections: 0`.
+- **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
+
+---
+
+## Milestone 8 — Transfers (Prompt 1: Slices 8.1, 8.2, 8.3, 8.4)
+
+- **Status**: Completed (Pending User Manual Verification)
+- **Completed Slices**:
+  - **Slice 8.1 — Transfer Request**:
+    - Created `transfers`, `transfer_items`, and `transfer_events` schemas along with sequence `transfer_number_seq` (`TRF-XXXXXX`).
+    - Drizzle migration `0017_thankful_mole_man.sql` generated and applied.
+    - Endpoints implemented: `POST /api/v1/transfers` for creating transfer requests.
+    - Role authorization: `OWNER` can request transfers between any branches; `EMPLOYEE` can request stock only involving their assigned branch.
+    - Same-branch transfer requests strictly rejected (`sourceBranchId !== destinationBranchId`).
+    - Multiple line items supported with positive integer requested quantities.
+    - Frontend `NewTransferPage.tsx` built with route selection, live source branch stock display, product item manager, and validation.
+    - `TransfersListPage.tsx` built at `/transfers` with status filter, branch filters, search, and "New Transfer" action.
+  - **Slice 8.2 — Transfer Details**:
+    - Single dedicated canonical page implemented at `/transfers/:id` (`TransferDetailsPage.tsx`).
+    - Read-only summary card displaying Direction (`Source -> Destination`), Transfer Number (`TRF-XXXXXX`), Status badge, and timestamps.
+    - 5-step Progress Stepper (`Requested -> Approved -> Dispatched -> Received -> Closed`) visually indicating current progress and terminal rejection.
+    - Line items table showing Product, Requested Quantity, Approved Quantity, Dispatched Quantity, Received Quantity (reserved for Prompt 2), and Unit Cost (visible only to Owner).
+    - Event history timeline logging state transitions with actor attribution and notes.
+    - State-aware action toolbar rendering only permitted transitions based on current status and user role.
+    - Endpoint implemented: `GET /api/v1/transfers/:id`.
+  - **Slice 8.3 — Approval / Rejection**:
+    - Endpoints implemented: `POST /api/v1/transfers/:id/approve` and `POST /api/v1/transfers/:id/reject`.
+    - Authorization strictly restricted to `OWNER` role (`403 Forbidden` for employees).
+    - Full approval and partial quantity approval supported (`0 < approvedQuantity <= requestedQuantity`).
+    - Line items with `approvedQuantity = 0` are omitted from approved transfer items. If all items have zero approved quantity, approval is rejected.
+    - Rejection requires a mandatory reason and transitions transfer status to `REJECTED`.
+    - Atomic audit event recorded in `transfer_events` for approval and rejection.
+    - Modal dialogs on `TransferDetailsPage.tsx` for Owner approval (with editable approved quantities) and rejection (with mandatory reason textarea).
+  - **Slice 8.4 — Dispatch**:
+    - Endpoint implemented: `POST /api/v1/transfers/:id/dispatch`.
+    - Authorization strictly restricted to `OWNER` role (`403 Forbidden` for employees).
+    - Dispatch is valid only from `APPROVED` status.
+    - Live source branch inventory re-validation inside PostgreSQL transaction with row locks (`FOR UPDATE`).
+    - Atomic inventory ledger deduction: records `TRANSFER_OUT` movements via `InventoryService.recordMovement`, immediately decreasing source branch `availableQuantity`.
+    - Destination stock remains untouched upon dispatch (in-transit representation; receiving is reserved for Prompt 2).
+    - Status transitioned to `DISPATCHED`.
+    - Modal dialog on `TransferDetailsPage.tsx` for Owner dispatch confirmation with optional dispatch notes.
+- **Architectural & Design Compliance**:
+  - Slices 8.5 (Receive) and 8.6 (Discrepancy) strictly omitted for Prompt 2.
+  - Stitch UI Design Reference Section 5.8 (Transfer Details) followed closely for single details page, direction banner, stepper, and modals.
+  - No duplicate breadcrumbs in pages.
+  - Fully strict TypeScript, Zod schema validation, transaction atomicity, and ledger immutability.
+- **Automated Verification Performed**:
+  - Backend integration test suite: `apps/api/src/modules/transfers/transfers.test.ts` (23/23 tests passed).
+  - Frontend API test suite: `apps/web/src/features/transfers/api/transfersApi.test.tsx` (7/7 tests passed).
+  - Frontend component test suite: `apps/web/src/features/transfers/TransfersPage.test.tsx` (4/4 tests passed).
+  - Monorepo test suite: 28 test files, **170 / 170 tests passing**.
+  - Monorepo typecheck: `npm run typecheck` passed with **0 errors**.
+  - Production build: `npm run build` passed with 0 errors across API and Web.
+  - PostgreSQL database verified: `branches: 3, users: 4, products: 6, transfers: 0` ready.
+- **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
+
+
+
