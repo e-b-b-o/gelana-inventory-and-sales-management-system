@@ -5,6 +5,8 @@ import { users } from "./users.js";
 import { products } from "./products.js";
 import { productUnits } from "./productUnits.js";
 import { paymentMethods } from "./paymentMethods.js";
+import { salesReturns } from "./returns.js";
+import { saleCorrections } from "./saleCorrections.js";
 import { pgSequence } from "drizzle-orm/pg-core";
 
 export const saleNumberSeq = pgSequence("sale_number_seq", { startWith: 1, increment: 1 });
@@ -19,6 +21,7 @@ export const sales = pgTable("sales", {
   subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull().default("0"),
   saleDiscount: numeric("sale_discount", { precision: 12, scale: 2 }).notNull().default("0"),
   grandTotal: numeric("grand_total", { precision: 12, scale: 2 }).notNull().default("0"),
+  status: varchar("status", { length: 50 }).notNull().default("COMPLETED"), // COMPLETED, VOIDED
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(), // System entry time
 });
 
@@ -55,6 +58,8 @@ export const salesRelations = relations(sales, ({ one, many }) => ({
   }),
   items: many(saleItems),
   payments: many(salePayments),
+  returns: many(salesReturns),
+  corrections: many(saleCorrections),
 }));
 
 export const saleItemsRelations = relations(saleItems, ({ one }) => ({
