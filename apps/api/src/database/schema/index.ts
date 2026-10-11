@@ -11,3 +11,6 @@ export * from "./receivings.js";
 export * from "./inventoryBalances.js";
 export * from "./inventoryMovements.js";
 export * from "./sales.js";
+export * from "./returns.js";
+export * from "./saleCorrections.js";
+export * from "./transfers.js";
