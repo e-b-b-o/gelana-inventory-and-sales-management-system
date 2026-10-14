@@ -24,6 +24,8 @@ import { ReturnDetailsPage } from "../../features/returns/ReturnDetailsPage";
 import { TransfersListPage } from "../../features/transfers/TransfersListPage";
 import { NewTransferPage } from "../../features/transfers/NewTransferPage";
 import { TransferDetailsPage } from "../../features/transfers/TransferDetailsPage";
+import { CurrentClosingPage } from "../../features/closing/CurrentClosingPage";
+import { ClosingHistoryPage } from "../../features/closing/ClosingHistoryPage";
 
 
 function ProtectedRoute() {
@@ -156,6 +158,14 @@ export const routes = [
           {
             path: "transfers/:id",
             element: <TransferDetailsPage />
+          },
+          {
+            path: "daily-closing",
+            element: <CurrentClosingPage />
+          },
+          {
+            path: "daily-closing/history",
+            element: <ClosingHistoryPage />
           }
         ]
 

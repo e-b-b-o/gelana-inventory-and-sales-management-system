@@ -207,7 +207,14 @@ export function Sidebar({ isOwner, logoutMutation, user }: SidebarProps) {
             </>
           )}
 
-          <NavItem to="/daily-closing" label="Daily Closing" icon="lock_clock" />
+          <NavGroup
+            label="Daily Closing"
+            icon="lock_clock"
+            items={[
+              { to: "/daily-closing", label: "Current Closing", icon: "event_available" },
+              { to: "/daily-closing/history", label: "Closing History", icon: "history" },
+            ]}
+          />
           
           {isOwner && (
             <NavItem to="/reports" label="Reports" icon="bar_chart" />
