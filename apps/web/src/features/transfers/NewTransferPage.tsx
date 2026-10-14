@@ -34,13 +34,18 @@ export function NewTransferPage() {
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [transferDirection, setTransferDirection] = useState<"INBOUND" | "OUTBOUND">("OUTBOUND");
 
-  // If employee, set default destination branch to employee's assigned branch
+  // If employee, set default source or destination branch to employee's assigned branch
   useEffect(() => {
     if (user && !isOwner && user.branchId) {
-      setDestinationBranchId(user.branchId);
+      if (transferDirection === "INBOUND") {
+        setDestinationBranchId(user.branchId);
+      } else {
+        setSourceBranchId(user.branchId);
+      }
     }
-  }, [user, isOwner]);
+  }, [user, isOwner, transferDirection]);
 
   // Fetch balances for source branch to show real-time stock
   const { data: sourceBalancesData } = useInventoryBalances({
@@ -200,10 +205,55 @@ export function NewTransferPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* SECTION 1: BRANCH SELECTION & ROUTE */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">1</span>
-            <h2 className="text-base font-bold text-slate-900">Transfer Route</h2>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">1</span>
+              <h2 className="text-base font-bold text-slate-900">Transfer Route</h2>
+            </div>
+            {!isOwner && user?.branchId && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700">
+                Your Branch: {branches.find((b: any) => b.id === user.branchId)?.name || "Assigned Branch"}
+              </span>
+            )}
           </div>
+
+          {!isOwner && user?.branchId && (
+            <div className="flex flex-wrap items-center gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+              <span className="font-bold text-slate-700 uppercase tracking-wider">
+                Transfer Purpose:
+              </span>
+              <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name="transferDirection"
+                  checked={transferDirection === "OUTBOUND"}
+                  onChange={() => {
+                    setTransferDirection("OUTBOUND");
+                    setSourceBranchId(user.branchId);
+                    setDestinationBranchId("");
+                    setValidationError(null);
+                  }}
+                  className="text-primary focus:ring-primary"
+                />
+                <span>Send stock <strong>out</strong> from my branch</span>
+              </label>
+              <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name="transferDirection"
+                  checked={transferDirection === "INBOUND"}
+                  onChange={() => {
+                    setTransferDirection("INBOUND");
+                    setDestinationBranchId(user.branchId);
+                    setSourceBranchId("");
+                    setValidationError(null);
+                  }}
+                  className="text-primary focus:ring-primary"
+                />
+                <span>Request stock <strong>in</strong> to my branch</span>
+              </label>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -216,7 +266,8 @@ export function NewTransferPage() {
                   setSourceBranchId(e.target.value);
                   setValidationError(null);
                 }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-primary outline-none cursor-pointer"
+                disabled={!isOwner && transferDirection === "OUTBOUND"}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-primary outline-none cursor-pointer disabled:bg-slate-100 disabled:text-slate-500"
               >
                 <option value="">Select source branch...</option>
                 {branches.map((b: any) => (
@@ -226,7 +277,9 @@ export function NewTransferPage() {
                 ))}
               </select>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Branch from which products will physically be dispatched.
+                {!isOwner && transferDirection === "OUTBOUND"
+                  ? "Your assigned branch will physically dispatch the stock."
+                  : "Branch from which products will physically be dispatched."}
               </span>
             </div>
 
@@ -240,7 +293,7 @@ export function NewTransferPage() {
                   setDestinationBranchId(e.target.value);
                   setValidationError(null);
                 }}
-                disabled={!isOwner && Boolean(user?.branchId)}
+                disabled={!isOwner && transferDirection === "INBOUND"}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-primary outline-none cursor-pointer disabled:bg-slate-100 disabled:text-slate-500"
               >
                 <option value="">Select destination branch...</option>
@@ -251,8 +304,8 @@ export function NewTransferPage() {
                 ))}
               </select>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                {!isOwner
-                  ? "Defaulted to your assigned branch."
+                {!isOwner && transferDirection === "INBOUND"
+                  ? "Your assigned branch will receive the goods."
                   : "Branch that will receive the goods."}
               </span>
             </div>

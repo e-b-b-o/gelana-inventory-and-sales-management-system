@@ -25,6 +25,8 @@ vi.mock("./api", async (importOriginal) => {
     useApproveTransfer: vi.fn(),
     useRejectTransfer: vi.fn(),
     useDispatchTransfer: vi.fn(),
+    useReceiveTransfer: vi.fn(),
+    useResolveDiscrepancy: vi.fn(),
   };
 });
 
@@ -237,6 +239,14 @@ describe("Transfers Frontend Pages", () => {
       expect(screen.getByText("Transfer Progress")).toBeDefined();
       expect(screen.getByText("A4 Paper")).toBeDefined();
 
+      // No page-level Back to Transfers link
+      expect(screen.queryByText("Back to Transfers")).toBeNull();
+
+      // Directional Route Indicator
+      expect(screen.getByText("BR1 → BR2")).toBeDefined();
+      expect(screen.getByText("Branch 1")).toBeDefined();
+      expect(screen.getByText("Branch 2")).toBeDefined();
+
       // Owner action buttons available for REQUESTED status
       expect(screen.getByText("Approve Transfer")).toBeDefined();
       expect(screen.getByText("Reject Request")).toBeDefined();
@@ -289,5 +299,113 @@ describe("Transfers Frontend Pages", () => {
       expect(screen.getByText("Dispatch Stock")).toBeDefined();
       expect(screen.queryByText("Approve Transfer")).toBeNull();
     });
+
+    it("renders Receive Stock action when transfer is DISPATCHED for destination branch employee or Owner", () => {
+      vi.mocked(transfersApi.useTransferDetails).mockReturnValue({
+        data: {
+          id: "trf-1",
+          transferNumber: "TRF-000018",
+          status: "DISPATCHED",
+          sourceBranch: { id: "branch-1", name: "Branch 1", code: "BR1" },
+          destinationBranch: { id: "branch-2", name: "Branch 2", code: "BR2" },
+          destinationBranchId: "branch-2",
+          createdBy: { name: "Dawit T." },
+          approvedBy: { name: "System Owner" },
+          dispatchedBy: { name: "System Owner" },
+          createdAt: "2026-10-11T12:00:00Z",
+          approvedAt: "2026-10-11T12:30:00Z",
+          dispatchedAt: "2026-10-11T13:00:00Z",
+          items: [
+            {
+              id: "item-1",
+              productId: "prod-1",
+              product: { name: "A4 Paper", sku: "SKU-001" },
+              unit: { name: "Ream" },
+              requestedQuantity: 20,
+              approvedQuantity: 20,
+              dispatchedQuantity: 20,
+              sourceAvailableQuantity: 30,
+            },
+          ],
+          events: [],
+        },
+        isLoading: false,
+        isError: false,
+      } as any);
+
+      vi.mocked(transfersApi.useReceiveTransfer).mockReturnValue({ mutate: vi.fn(), isPending: false } as any);
+      vi.mocked(transfersApi.useDispatchTransfer).mockReturnValue({ mutate: vi.fn(), isPending: false } as any);
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/transfers/trf-1"]}>
+            <Routes>
+              <Route path="/transfers/:id" element={<TransferDetailsPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      expect(screen.getByText("Receive Stock")).toBeDefined();
+      expect(screen.getByText("Dispatched (In Transit)")).toBeDefined();
+    });
+
+    it("renders Prominent Discrepancy Card and Review Discrepancy button when status is DISCREPANCY", () => {
+      vi.mocked(transfersApi.useTransferDetails).mockReturnValue({
+        data: {
+          id: "trf-1",
+          transferNumber: "TRF-000018",
+          status: "DISCREPANCY",
+          hasDiscrepancy: true,
+          sourceBranch: { id: "branch-1", name: "Branch 1", code: "BR1" },
+          destinationBranch: { id: "branch-2", name: "Branch 2", code: "BR2" },
+          destinationBranchId: "branch-2",
+          createdBy: { name: "Dawit T." },
+          receivedBy: { name: "Destination Staff" },
+          receivedAt: "2026-10-11T14:00:00Z",
+          receivingNotes: "Damaged packaging",
+          items: [
+            {
+              id: "item-1",
+              productId: "prod-1",
+              product: { name: "A4 Paper", sku: "SKU-001" },
+              unit: { name: "Ream" },
+              requestedQuantity: 20,
+              approvedQuantity: 20,
+              dispatchedQuantity: 20,
+              receivedQuantity: 15,
+              damagedQuantity: 3,
+              missingQuantity: 2,
+              discrepancyReason: "Box crushed during transit",
+              sourceAvailableQuantity: 30,
+            },
+          ],
+          events: [],
+        },
+        isLoading: false,
+        isError: false,
+      } as any);
+
+      vi.mocked(transfersApi.useResolveDiscrepancy).mockReturnValue({ mutate: vi.fn(), isPending: false } as any);
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/transfers/trf-1"]}>
+            <Routes>
+              <Route path="/transfers/:id" element={<TransferDetailsPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      // Discrepancy header badge
+      expect(screen.getAllByText("Received — Discrepancy").length).toBeGreaterThanOrEqual(1);
+
+      // Prominent Amber Discrepancy Card
+      expect(screen.getByText("Transfer Discrepancy Flagged")).toBeDefined();
+      expect(screen.getByText(/Box crushed during transit/)).toBeDefined();
+      expect(screen.getAllByText("Resolve Discrepancy").length).toBeGreaterThanOrEqual(1);
+    });
   });
 });
+

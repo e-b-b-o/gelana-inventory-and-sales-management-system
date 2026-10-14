@@ -153,3 +153,64 @@ export const useDispatchTransfer = () => {
     },
   });
 };
+
+export type ReceiveTransferItemInput = {
+  itemId: string;
+  receivedQuantity: number;
+  damagedQuantity?: number;
+  discrepancyReason?: string;
+};
+
+export type ReceiveTransferPayload = {
+  items: ReceiveTransferItemInput[];
+  notes?: string;
+};
+
+export type ResolveDiscrepancyPayload = {
+  resolutionNotes: string;
+};
+
+export const useReceiveTransfer = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: ReceiveTransferPayload }) => {
+      const res = await fetchApi(`/transfers/${id}/receive`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["transfers"] }),
+        queryClient.invalidateQueries({ queryKey: ["transfer-details", variables.id] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory", "balances"] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory", "movements"] }),
+      ]);
+    },
+  });
+};
+
+export const useResolveDiscrepancy = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: ResolveDiscrepancyPayload }) => {
+      const res = await fetchApi(`/transfers/${id}/resolve-discrepancy`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["transfers"] }),
+        queryClient.invalidateQueries({ queryKey: ["transfer-details", variables.id] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory", "balances"] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory", "movements"] }),
+      ]);
+    },
+  });
+};
+
