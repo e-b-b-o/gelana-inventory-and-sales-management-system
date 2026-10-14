@@ -876,9 +876,9 @@ Milestone 5 (Receiving) - Slice 5.1 (Receiving).
 
 ---
 
-## Milestone 8 — Transfers (Prompt 1: Slices 8.1, 8.2, 8.3, 8.4)
+## Milestone 8 — Transfers (Slices 8.1 – 8.6 Complete)
 
-- **Status**: Completed (Pending User Manual Verification)
+- **Status**: Implemented, Automated Checks Passed, Pending User Manual Verification
 - **Completed Slices**:
   - **Slice 8.1 — Transfer Request**:
     - Created `transfers`, `transfer_items`, and `transfer_events` schemas along with sequence `transfer_number_seq` (`TRF-XXXXXX`).
@@ -892,8 +892,8 @@ Milestone 5 (Receiving) - Slice 5.1 (Receiving).
   - **Slice 8.2 — Transfer Details**:
     - Single dedicated canonical page implemented at `/transfers/:id` (`TransferDetailsPage.tsx`).
     - Read-only summary card displaying Direction (`Source -> Destination`), Transfer Number (`TRF-XXXXXX`), Status badge, and timestamps.
-    - 5-step Progress Stepper (`Requested -> Approved -> Dispatched -> Received -> Closed`) visually indicating current progress and terminal rejection.
-    - Line items table showing Product, Requested Quantity, Approved Quantity, Dispatched Quantity, Received Quantity (reserved for Prompt 2), and Unit Cost (visible only to Owner).
+    - 5-step Progress Stepper (`Requested -> Approved -> Dispatched -> Received -> Completed`) visually indicating current progress.
+    - Line items table showing Product, Requested Quantity, Approved Quantity, Dispatched Quantity, Received Quantity, and Unit Cost (visible only to Owner).
     - Event history timeline logging state transitions with actor attribution and notes.
     - State-aware action toolbar rendering only permitted transitions based on current status and user role.
     - Endpoint implemented: `GET /api/v1/transfers/:id`.
@@ -901,7 +901,6 @@ Milestone 5 (Receiving) - Slice 5.1 (Receiving).
     - Endpoints implemented: `POST /api/v1/transfers/:id/approve` and `POST /api/v1/transfers/:id/reject`.
     - Authorization strictly restricted to `OWNER` role (`403 Forbidden` for employees).
     - Full approval and partial quantity approval supported (`0 < approvedQuantity <= requestedQuantity`).
-    - Line items with `approvedQuantity = 0` are omitted from approved transfer items. If all items have zero approved quantity, approval is rejected.
     - Rejection requires a mandatory reason and transitions transfer status to `REJECTED`.
     - Atomic audit event recorded in `transfer_events` for approval and rejection.
     - Modal dialogs on `TransferDetailsPage.tsx` for Owner approval (with editable approved quantities) and rejection (with mandatory reason textarea).
@@ -911,23 +910,131 @@ Milestone 5 (Receiving) - Slice 5.1 (Receiving).
     - Dispatch is valid only from `APPROVED` status.
     - Live source branch inventory re-validation inside PostgreSQL transaction with row locks (`FOR UPDATE`).
     - Atomic inventory ledger deduction: records `TRANSFER_OUT` movements via `InventoryService.recordMovement`, immediately decreasing source branch `availableQuantity`.
-    - Destination stock remains untouched upon dispatch (in-transit representation; receiving is reserved for Prompt 2).
+    - Destination stock remains untouched upon dispatch (in-transit representation).
     - Status transitioned to `DISPATCHED`.
     - Modal dialog on `TransferDetailsPage.tsx` for Owner dispatch confirmation with optional dispatch notes.
+  - **Slice 8.5 — Receive Transfer**:
+    - Endpoint implemented: `POST /api/v1/transfers/:id/receive`.
+    - Authorization: Destination branch Employee can receive transfer for their branch; Owner can receive for any branch (`403 Forbidden` for source employee or unrelated branch employee).
+    - Valid only from `DISPATCHED` status.
+    - Destination branch inventory increases atomically: records `TRANSFER_IN` movements in `inventory_movements`, increasing destination branch `availableQuantity`.
+    - Source stock is NOT deducted again (was already deducted at dispatch).
+    - Source unit-cost snapshot preserved; destination WAC is NOT recalculated on transfer (`changesWac: false`).
+    - Overages strictly rejected (`goodQty + damagedQty <= dispatchedQty`).
+    - Audit event `RECEIVED` recorded with actor attribution and timestamp.
+    - Frontend Receive modal on `TransferDetailsPage.tsx` with good/damaged quantity inputs and live shortage computation.
+  - **Slice 8.6 — Transfer Discrepancy Handling**:
+    - Endpoint implemented: `POST /api/v1/transfers/:id/resolve-discrepancy`.
+    - Damaged stock handling: records `TRANSFER_DAMAGED` movement, increasing destination branch `damagedQuantity` (quarantined, not sellable).
+    - Missing stock handling: missing quantity is accounted for in `transfer_items.missingQuantity`; missing stock does NOT enter destination inventory.
+    - Strict quantity reconciliation: `goodQty + damagedQty + missingQty === dispatchedQty`.
+    - Mandatory discrepancy explanation on client and server whenever damage or shortage exists.
+    - When discrepancy is detected upon receiving:
+      - Transfer status transitions to `DISCREPANCY` (badge: `Received — Discrepancy`).
+      - `hasDiscrepancy: true` set on transfer.
+      - Stepper Step 4 shows Amber `warning` indicator (`Received · Discrepancy Noted`), Step 5 shows `Pending Owner Review`.
+      - Prominent Amber Discrepancy Card displayed according to Stitch UI reference Section 5.8, showing item breakdown, dispatched, received, and difference badges, and reported reason.
+    - Discrepancy resolution:
+      - Strictly `OWNER` only (`403 Forbidden` for employees).
+      - Requires mandatory resolution notes.
+      - Sets `discrepancyResolvedById`, `discrepancyResolvedAt`, `discrepancyResolutionNotes`, `closedById`, `closedAt`, `closingNotes`.
+      - Transitions status to `COMPLETED`.
+      - Records audit event `DISCREPANCY_RESOLVED`.
+- **Database Schema Changes & Migrations**:
+  - Migration `0018_regular_thanos.sql` generated and applied:
+    - Added `TRANSFER_DAMAGED` to `movement_type` enum.
+    - Added `received_by_id`, `received_at`, `receiving_notes`, `has_discrepancy`, `discrepancy_resolved_by_id`, `discrepancy_resolved_at`, `discrepancy_resolution_notes`, `closed_by_id`, `closed_at`, `closing_notes` to `transfers` table.
+    - Added `damaged_quantity`, `missing_quantity`, `discrepancy_reason` to `transfer_items` table.
+    - Added foreign-key relations for `receivedBy`, `discrepancyResolvedBy`, and `closedBy`.
 - **Architectural & Design Compliance**:
-  - Slices 8.5 (Receive) and 8.6 (Discrepancy) strictly omitted for Prompt 2.
-  - Stitch UI Design Reference Section 5.8 (Transfer Details) followed closely for single details page, direction banner, stepper, and modals.
+  - Stitch UI Design Reference Section 5.8 (Transfer Details) followed directly for single details page, direction banner, stepper, items table with discrepancy badges, prominent amber discrepancy card, and modal dialogs.
+  - Employee views strictly omit sensitive financial data (`sourceUnitCost`, `estimatedTotalCost`).
   - No duplicate breadcrumbs in pages.
-  - Fully strict TypeScript, Zod schema validation, transaction atomicity, and ledger immutability.
+  - Fully strict TypeScript, Zod validation, row locking (`FOR UPDATE`), transaction atomicity, and ledger immutability.
 - **Automated Verification Performed**:
-  - Backend integration test suite: `apps/api/src/modules/transfers/transfers.test.ts` (23/23 tests passed).
-  - Frontend API test suite: `apps/web/src/features/transfers/api/transfersApi.test.tsx` (7/7 tests passed).
-  - Frontend component test suite: `apps/web/src/features/transfers/TransfersPage.test.tsx` (4/4 tests passed).
-  - Monorepo test suite: 28 test files, **170 / 170 tests passing**.
-  - Monorepo typecheck: `npm run typecheck` passed with **0 errors**.
-  - Production build: `npm run build` passed with 0 errors across API and Web.
-  - PostgreSQL database verified: `branches: 3, users: 4, products: 6, transfers: 0` ready.
+  - Monorepo test suite: 29 test files, **194 / 194 tests passing**.
+    - Backend transfers integration test suite: `apps/api/src/modules/transfers/transfers.test.ts` (**35 / 35 tests passed** covering all 6 slices).
+    - Frontend transfers test suite: `apps/web/src/features/transfers/TransfersPage.test.tsx` (**7 / 7 tests passed**).
+  - Monorepo typecheck: `npm run typecheck` passed with **0 errors** across both API and Web.
+  - Monorepo linting: `npm run lint` passed with **0 errors**.
+  - Monorepo production build: `npm run build` passed with **0 errors** across both API and Web.
 - **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
+
+## Milestone 9 — Daily Closing (Slices 9.1–9.4)
+
+- **Status**: Implemented, Automated Checks Passed, Pending User Manual Verification
+- **Completed Slices**:
+  - **Slice 9.1 — Current Closing**:
+    - Backend endpoints: `GET /api/v1/closings/current` (scoped to user's assigned branch for employees, branch-selectable for Owner).
+    - Authoritative financial reconciliation:
+      - Gross Sales, Line/Order Discounts, Net Sales, Returns Deductions, Net Revenue, Total Transactions Count.
+      - Segregated payment method breakdown table (`daily_closing_payments`) tracking `receivedAmount`, `refundedAmount`, and `netAmount` per method (Cash, Credit Card, Bank Transfer, Telebirr).
+      - Strict Expected Cash formula: $\sum(\text{Cash payments on COMPLETED sales}) - \sum(\text{Cash refunds on COMPLETED sales returns})$. Voided sales and non-cash allocations excluded.
+    - Pre-submission readiness checks:
+      - Validated all sales recorded confirmation (`allSalesRecorded`).
+      - Local sync queue verification (zero un-synced operations).
+      - Pending transaction validation (no draft/in-progress sales).
+    - UI implementation (`CurrentClosingPage.tsx`):
+      - 3-step closing progress stepper (`In Progress` -> `Submitted` -> `Approved` / `Rejected`).
+      - Overview summary banner with branch selector for Owner, active date, closing reference code (`DCL-YYYYMMDD-XXXX`), status badge, and assigned cashier.
+      - 4-card financial metric grid (Gross Sales, Discounts, Returns, Net Revenue).
+      - Payment methods breakdown table with received, refunded, and net amounts.
+      - 3 KPI cash reconciliation cards (Expected Cash, Counted Cash, Cash Variance with color-coded Over/Short badges).
+      - Operational readiness checklist with status indicators.
+  - **Slice 9.2 — Closing Submission**:
+    - Backend endpoint: `POST /api/v1/closings/submit`.
+    - Live variance computation: `cashVariance = countedCash - expectedCash`.
+    - Strict validation:
+      - `allSalesRecorded` must be explicitly checked.
+      - If variance $\neq 0$, `discrepancyExplanation` is strictly required (min 5 characters) on both client and server.
+    - Locks the closing record in `SUBMITTED` status, preventing editing by branch employees.
+    - Captures submission timestamp and actor ID.
+    - Records immutable audit event `SUBMITTED` in `daily_closing_events`.
+  - **Slice 9.3 — Owner Review**:
+    - Backend endpoints: `POST /api/v1/closings/:id/approve` and `POST /api/v1/closings/:id/reject`.
+    - Strict role authorization: Only `OWNER` can approve or reject (`403 Forbidden` for employees).
+    - State machine validation: Approval/rejection only permitted from `SUBMITTED` status.
+    - Approval flow: Transitions status to `APPROVED`, records reviewer ID, approval timestamp, and optional review notes.
+    - Rejection flow: Requires mandatory rejection reason (min 5 characters), transitions status to `REJECTED`, and displays feedback banner to branch employee.
+    - Employee resubmission workflow:
+      - When `REJECTED`, employee can edit counted cash and discrepancy explanation.
+      - Resubmission transitions status back to `SUBMITTED`.
+      - Increments `revision` counter atomically.
+      - Preserves unbroken audit trail (`DRAFT_GENERATED` -> `SUBMITTED` -> `REJECTED` -> `RESUBMITTED` -> `APPROVED`).
+  - **Slice 9.4 — Closing History**:
+    - Backend endpoint: `GET /api/v1/closings` supporting pagination (`page`, `limit`), `branchId`, `status`, `startDate`, `endDate`.
+    - Role-based scoping: Employees see only their branch's closings; Owner can query and filter across all branches.
+    - Backend endpoint: `GET /api/v1/closings/:id` for detailed closing inspection.
+    - Frontend `ClosingHistoryPage.tsx` at `/daily-closing/history`:
+      - Filter toolbar: Search, branch selector (Owner), status dropdown, date range picker.
+      - History data table: Date, Branch, Closing #, Expected Cash, Counted Cash, Variance, Revision, Status badge, Submitter, Actions.
+      - Pagination controls with total count and page size options.
+      - Detailed inspection modal: Full closing summary, payment method breakdown, discrepancy explanation, review feedback, and complete event timeline.
+- **Database Schema Changes & Migrations**:
+  - Drizzle migration `0019_complete_speedball.sql`:
+    - Sequence `daily_closing_number_seq` generating identifiers `DCL-YYYYMMDD-XXXX`.
+    - Table `daily_closings` with foreign keys to `branches` and `users`.
+    - Unique index `daily_closings_branch_date_idx` on `(branch_id, closing_date)` preventing duplicate closings for the same branch and date.
+    - Table `daily_closing_payments` for per-method financial allocations.
+    - Table `daily_closing_events` for append-only audit trail logging.
+- **Architectural & Design Compliance**:
+  - Strict compliance with Stitch UI Design System: responsive layout, modern typography, card elevation, accessible modals, and color-coded status badges.
+  - Sensitive cost, WAC, and gross profit data are strictly omitted from daily closing endpoints and UI (visible only on dedicated Owner Profit Reports in Milestone 10).
+  - Concurrency safety: pessimistic row locking (`FOR UPDATE`) in PostgreSQL transactions for all closing state transitions.
+  - Zero-drift decimal arithmetic (`b.netAmount`, `Number(b.countedCash) - Number(b.expectedCash)`).
+  - Page layout and navigation alignment: removed internal duplicate breadcrumbs from `CurrentClosingPage.tsx` and `ClosingHistoryPage.tsx`, aligned root container to `space-y-6`, inheriting standard `p-margin` and `max-w-7xl` from `AppShell` for consistent vertical start, margins, and sidebar distance across all pages.
+- **Automated Verification Performed**:
+  - Monorepo test suite: **32 test files, 222 / 222 tests passing**.
+    - Backend closing integration tests: `apps/api/src/modules/closing/closing.test.ts` (**14 / 14 tests passed**).
+    - Backend closing schema tests: `apps/api/src/modules/closing/schema.test.ts` (**9 / 9 tests passed**).
+    - Database seed integration tests: `apps/api/src/database/seeds/seeds.test.ts` (**7 / 7 tests passed**).
+    - Frontend closing UI tests: `apps/web/src/features/closing/ClosingPage.test.tsx` (**5 / 5 tests passed**).
+  - Monorepo typecheck: `npm run typecheck` passed with **0 errors** across both API and Web.
+  - Monorepo linting: `npm run lint` passed with **0 errors**.
+  - Monorepo production build: `npm run build` passed with **0 errors** across both API and Web.
+- **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
+
+
 
 
 

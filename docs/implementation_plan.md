@@ -66,15 +66,15 @@ The project is built using incremental end-to-end vertical slices.
 ### Slice 8.2 — Transfer Details (Completed)
 ### Slice 8.3 — Approval / Rejection (Completed)
 ### Slice 8.4 — Dispatch (Completed)
-### Slice 8.5 — Receive
-### Slice 8.6 — Discrepancy
+### Slice 8.5 — Receive (Completed)
+### Slice 8.6 — Discrepancy (Completed)
 
 ## 11. Milestone 9 — Daily Closing
 
-### Slice 9.1 — Current Closing
-### Slice 9.2 — Closing Submission
-### Slice 9.3 — Owner Review
-### Slice 9.4 — Closing History
+### Slice 9.1 — Current Closing (Completed)
+### Slice 9.2 — Closing Submission (Completed)
+### Slice 9.3 — Owner Review (Completed)
+### Slice 9.4 — Closing History (Completed)
 
 ## 12. Milestone 10 — Dashboard & Reports
 
