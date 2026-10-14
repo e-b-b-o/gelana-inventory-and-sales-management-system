@@ -98,6 +98,19 @@ describe("Database Seeding Baseline & Idempotency", () => {
     expect(empDev).toBeDefined();
     expect(empDev?.role).toBe("EMPLOYEE");
     expect(empDev?.branchId).toBe(SEED_IDS.branches.main);
+
+    // Check Downtown and Warehouse branch employees
+    const empDowntown = allUsers.find(u => u.email === "downtown@gelana.com");
+    expect(empDowntown).toBeDefined();
+    expect(empDowntown?.role).toBe("EMPLOYEE");
+    expect(empDowntown?.branchId).toBe(SEED_IDS.branches.downtown);
+    expect(empDowntown?.isActive).toBe(true);
+
+    const empWarehouse = allUsers.find(u => u.email === "warehouse@gelana.com");
+    expect(empWarehouse).toBeDefined();
+    expect(empWarehouse?.role).toBe("EMPLOYEE");
+    expect(empWarehouse?.branchId).toBe(SEED_IDS.branches.warehouse);
+    expect(empWarehouse?.isActive).toBe(true);
   });
 
   it("is idempotent: running seed again does not duplicate or multiply records", async () => {

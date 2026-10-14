@@ -47,6 +47,8 @@ export const SEED_IDS = {
     ownerDev: "00000000-0000-4000-8000-000000000502",
     employeeGelana: "00000000-0000-4000-8000-000000000503",
     employeeDev: "00000000-0000-4000-8000-000000000504",
+    downtownGelana: "00000000-0000-4000-8000-000000000505",
+    warehouseGelana: "00000000-0000-4000-8000-000000000506",
   },
   paymentMethods: {
     cash: "00000000-0000-4000-8000-000000000601",
@@ -70,7 +72,8 @@ export async function seedDatabase(options: { reset?: boolean } = { reset: true 
         branches, users, branch_assignments, categories, products, 
         product_units, product_unit_conversions, product_prices, suppliers, 
         payment_methods, receivings, receiving_items, inventory_balances, 
-        inventory_movements, sales, sale_items, sale_payments 
+        inventory_movements, sales, sale_items, sale_payments,
+        daily_closings, daily_closing_payments, daily_closing_events
       CASCADE;
     `);
   }
@@ -327,6 +330,24 @@ export async function seedDatabase(options: { reset?: boolean } = { reset: true 
       passwordHash,
       role: "EMPLOYEE" as const,
       branchId: SEED_IDS.branches.main,
+      isActive: true,
+    },
+    {
+      id: SEED_IDS.users.downtownGelana,
+      name: "Downtown Employee",
+      email: "downtown@gelana.com",
+      passwordHash,
+      role: "EMPLOYEE" as const,
+      branchId: SEED_IDS.branches.downtown,
+      isActive: true,
+    },
+    {
+      id: SEED_IDS.users.warehouseGelana,
+      name: "Warehouse Employee",
+      email: "warehouse@gelana.com",
+      passwordHash,
+      role: "EMPLOYEE" as const,
+      branchId: SEED_IDS.branches.warehouse,
       isActive: true,
     },
   ];
