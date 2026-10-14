@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, numeric, integer, pgSequence, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, numeric, integer, boolean, pgSequence, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { branches } from "./branches.js";
 import { users } from "./users.js";
@@ -12,7 +12,7 @@ export const transfers = pgTable("transfers", {
   transferNumber: varchar("transfer_number", { length: 50 }).notNull().unique(), // e.g. TRF-000001
   sourceBranchId: uuid("source_branch_id").notNull().references(() => branches.id),
   destinationBranchId: uuid("destination_branch_id").notNull().references(() => branches.id),
-  status: varchar("status", { length: 50 }).notNull().default("REQUESTED"), // 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'DISPATCHED'
+  status: varchar("status", { length: 50 }).notNull().default("REQUESTED"), // 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'DISPATCHED' | 'RECEIVED' | 'DISCREPANCY' | 'COMPLETED'
   notes: varchar("notes", { length: 255 }),
   createdById: uuid("created_by_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
@@ -25,6 +25,16 @@ export const transfers = pgTable("transfers", {
   dispatchedById: uuid("dispatched_by_id").references(() => users.id),
   dispatchedAt: timestamp("dispatched_at", { mode: "string" }),
   dispatchNotes: varchar("dispatch_notes", { length: 255 }),
+  receivedById: uuid("received_by_id").references(() => users.id),
+  receivedAt: timestamp("received_at", { mode: "string" }),
+  receivingNotes: varchar("receiving_notes", { length: 255 }),
+  hasDiscrepancy: boolean("has_discrepancy").notNull().default(false),
+  discrepancyResolvedById: uuid("discrepancy_resolved_by_id").references(() => users.id),
+  discrepancyResolvedAt: timestamp("discrepancy_resolved_at", { mode: "string" }),
+  discrepancyResolutionNotes: varchar("discrepancy_resolution_notes", { length: 255 }),
+  closedById: uuid("closed_by_id").references(() => users.id),
+  closedAt: timestamp("closed_at", { mode: "string" }),
+  closingNotes: varchar("closing_notes", { length: 255 }),
   updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow(),
 }, (table) => {
   return {
@@ -42,7 +52,10 @@ export const transferItems = pgTable("transfer_items", {
   requestedQuantity: integer("requested_quantity").notNull(),
   approvedQuantity: integer("approved_quantity"),
   dispatchedQuantity: integer("dispatched_quantity"),
-  receivedQuantity: integer("received_quantity"), // Reserved for Prompt 2 (Slice 8.5)
+  receivedQuantity: integer("received_quantity"), // Quantity physically received as sellable
+  damagedQuantity: integer("damaged_quantity").notNull().default(0), // Quantity received damaged
+  missingQuantity: integer("missing_quantity").notNull().default(0), // Quantity dispatched but missing
+  discrepancyReason: varchar("discrepancy_reason", { length: 255 }),
   sourceUnitCost: numeric("source_unit_cost", { precision: 12, scale: 2 }), // Captured at dispatch time
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 }, (table) => {
@@ -55,7 +68,7 @@ export const transferItems = pgTable("transfer_items", {
 export const transferEvents = pgTable("transfer_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   transferId: uuid("transfer_id").notNull().references(() => transfers.id, { onDelete: "cascade" }),
-  eventType: varchar("event_type", { length: 50 }).notNull(), // 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'DISPATCHED'
+  eventType: varchar("event_type", { length: 50 }).notNull(), // 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'DISPATCHED' | 'RECEIVED' | 'DISCREPANCY' | 'DISCREPANCY_RESOLVED' | 'CLOSED'
   actorId: uuid("actor_id").notNull().references(() => users.id),
   notes: varchar("notes", { length: 255 }),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
@@ -95,6 +108,21 @@ export const transfersRelations = relations(transfers, ({ one, many }) => ({
     fields: [transfers.dispatchedById],
     references: [users.id],
     relationName: "transferDispatchedBy",
+  }),
+  receivedBy: one(users, {
+    fields: [transfers.receivedById],
+    references: [users.id],
+    relationName: "transferReceivedBy",
+  }),
+  discrepancyResolvedBy: one(users, {
+    fields: [transfers.discrepancyResolvedById],
+    references: [users.id],
+    relationName: "transferDiscrepancyResolvedBy",
+  }),
+  closedBy: one(users, {
+    fields: [transfers.closedById],
+    references: [users.id],
+    relationName: "transferClosedBy",
   }),
   items: many(transferItems),
   events: many(transferEvents),

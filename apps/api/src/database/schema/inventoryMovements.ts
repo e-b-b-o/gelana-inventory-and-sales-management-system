@@ -17,6 +17,7 @@ export const movementTypeEnum = pgEnum("movement_type", [
   "RETURN_GOOD",
   "RETURN_DAMAGED",
   "DISPOSAL",
+  "TRANSFER_DAMAGED",
 ]);
 
 export const inventoryMovements = pgTable("inventory_movements", {
