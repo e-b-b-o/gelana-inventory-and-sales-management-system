@@ -18,6 +18,7 @@ import rateLimit from "express-rate-limit";
 import { salesRoutes } from "./modules/sales/routes.js";
 import { returnsRouter } from "./modules/returns/routes.js";
 import { transfersRouter } from "./modules/transfers/routes.js";
+import { closingRouter } from "./modules/closing/routes.js";
 
 export const app = express();
 
@@ -68,5 +69,6 @@ app.use("/api/v1/inventory", inventoryRouter);
 app.use("/api/v1/sales", salesRoutes);
 app.use("/api/v1/returns", returnsRouter);
 app.use("/api/v1/transfers", transfersRouter);
+app.use("/api/v1/closings", closingRouter);
 
 app.use(errorHandler);
