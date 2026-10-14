@@ -630,4 +630,355 @@ describe("Transfers Workflow (Slices 8.1 - 8.4)", () => {
       ).rejects.toThrow("Only the Owner can dispatch transfers");
     });
   });
+
+  describe("Slice 8.5 — Receive Transfer", () => {
+    let dispatchedTransferId: string;
+    let transferItemId1: string;
+
+    beforeEach(async () => {
+      const transfer = await TransfersService.createTransfer(
+        {
+          sourceBranchId,
+          destinationBranchId: destBranchId,
+          items: [{ productId: product1Id, requestedQuantity: 20 }],
+        },
+        { id: ownerId, role: "OWNER" }
+      );
+      await TransfersService.approveTransfer(transfer.id, {}, { id: ownerId, role: "OWNER" });
+      await TransfersService.dispatchTransfer(transfer.id, {}, { id: ownerId, role: "OWNER" });
+
+      dispatchedTransferId = transfer.id;
+      const [item] = await db.select().from(transferItems).where(eq(transferItems.transferId, transfer.id));
+      transferItemId1 = item!.id;
+    });
+
+    it("should successfully receive full dispatched stock at destination branch by authorized destination employee", async () => {
+      const res = await TransfersService.receiveTransfer(
+        dispatchedTransferId,
+        {
+          items: [
+            {
+              itemId: transferItemId1,
+              receivedQuantity: 20,
+              damagedQuantity: 0,
+            },
+          ],
+          notes: "Received in pristine condition",
+        },
+        { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+      );
+
+      expect(res.status).toBe("COMPLETED");
+      expect(res.hasDiscrepancy).toBe(false);
+      expect(res.receivedById).toBe(destEmployeeId);
+      expect(res.closedById).toBe(destEmployeeId);
+
+      // Verify destination inventory balance increased
+      const [destBalance] = await db
+        .select()
+        .from(inventoryBalances)
+        .where(and(eq(inventoryBalances.branchId, destBranchId), eq(inventoryBalances.productId, product1Id)));
+      expect(destBalance!.availableQuantity).toBe(20);
+      expect(destBalance!.damagedQuantity).toBe(0);
+      // Destination WAC should remain initial 0.00 (not modified by transfer)
+      expect(destBalance!.wac).toBe("0.00");
+
+      // Verify ledger movement
+      const [movement] = await db
+        .select()
+        .from(inventoryMovements)
+        .where(and(eq(inventoryMovements.referenceId, dispatchedTransferId), eq(inventoryMovements.movementType, "TRANSFER_IN")));
+      expect(movement).toBeDefined();
+      expect(movement!.quantity).toBe(20);
+      expect(movement!.branchId).toBe(destBranchId);
+
+      // Verify source inventory was not touched again (still 30 available)
+      const [srcBalance] = await db
+        .select()
+        .from(inventoryBalances)
+        .where(and(eq(inventoryBalances.branchId, sourceBranchId), eq(inventoryBalances.productId, product1Id)));
+      expect(srcBalance!.availableQuantity).toBe(30);
+
+      // Verify audit event
+      const events = await db.select().from(transferEvents).where(eq(transferEvents.transferId, dispatchedTransferId));
+      expect(events.some((e) => e.eventType === "RECEIVED")).toBe(true);
+    });
+
+    it("should allow Owner to receive stock for destination branch", async () => {
+      const res = await TransfersService.receiveTransfer(
+        dispatchedTransferId,
+        {
+          items: [{ itemId: transferItemId1, receivedQuantity: 20, damagedQuantity: 0 }],
+        },
+        { id: ownerId, role: "OWNER" }
+      );
+
+      expect(res.status).toBe("COMPLETED");
+      expect(res.receivedById).toBe(ownerId);
+    });
+
+    it("should reject receiving before dispatch (e.g. APPROVED or REQUESTED transfer)", async () => {
+      const newTransfer = await TransfersService.createTransfer(
+        {
+          sourceBranchId,
+          destinationBranchId: destBranchId,
+          items: [{ productId: product1Id, requestedQuantity: 5 }],
+        },
+        { id: ownerId, role: "OWNER" }
+      );
+      const [item] = await db.select().from(transferItems).where(eq(transferItems.transferId, newTransfer.id));
+
+      await expect(
+        TransfersService.receiveTransfer(
+          newTransfer.id,
+          { items: [{ itemId: item!.id, receivedQuantity: 5, damagedQuantity: 0 }] },
+          { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+        )
+      ).rejects.toThrow('Cannot receive transfer with status "REQUESTED"');
+    });
+
+    it("should reject receiving by employee not assigned to destination branch", async () => {
+      // Source employee attempts to receive
+      await expect(
+        TransfersService.receiveTransfer(
+          dispatchedTransferId,
+          { items: [{ itemId: transferItemId1, receivedQuantity: 20, damagedQuantity: 0 }] },
+          { id: sourceEmployeeId, role: "EMPLOYEE", branchId: sourceBranchId }
+        )
+      ).rejects.toThrow("Only employees assigned to the destination branch can receive this transfer");
+
+      // Other branch employee attempts to receive
+      await expect(
+        TransfersService.receiveTransfer(
+          dispatchedTransferId,
+          { items: [{ itemId: transferItemId1, receivedQuantity: 20, damagedQuantity: 0 }] },
+          { id: otherEmployeeId, role: "EMPLOYEE", branchId: otherBranchId }
+        )
+      ).rejects.toThrow("Only employees assigned to the destination branch can receive this transfer");
+    });
+
+    it("should reject invalid item IDs in receive payload", async () => {
+      await expect(
+        TransfersService.receiveTransfer(
+          dispatchedTransferId,
+          { items: [{ itemId: crypto.randomUUID(), receivedQuantity: 20, damagedQuantity: 0 }] },
+          { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+        )
+      ).rejects.toThrow("Invalid item ID in receive payload");
+    });
+
+    it("should reject excess quantities above dispatched amount", async () => {
+      await expect(
+        TransfersService.receiveTransfer(
+          dispatchedTransferId,
+          { items: [{ itemId: transferItemId1, receivedQuantity: 25, damagedQuantity: 0 }] },
+          { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+        )
+      ).rejects.toThrow(/cannot exceed dispatched quantity/);
+    });
+
+    it("should prevent duplicate receiving on already completed transfer", async () => {
+      await TransfersService.receiveTransfer(
+        dispatchedTransferId,
+        { items: [{ itemId: transferItemId1, receivedQuantity: 20, damagedQuantity: 0 }] },
+        { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+      );
+
+      await expect(
+        TransfersService.receiveTransfer(
+          dispatchedTransferId,
+          { items: [{ itemId: transferItemId1, receivedQuantity: 20, damagedQuantity: 0 }] },
+          { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+        )
+      ).rejects.toThrow('Cannot receive transfer with status "COMPLETED"');
+    });
+
+    it("should hide cost information from employee in getTransferById", async () => {
+      const transfer = await TransfersService.getTransferById(
+        dispatchedTransferId,
+        { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+      );
+
+      expect(transfer.estimatedTotalCost).toBeUndefined();
+      expect(transfer.items[0]?.sourceUnitCost).toBeUndefined();
+    });
+  });
+
+  describe("Slice 8.6 — Transfer Discrepancy Handling", () => {
+    let dispatchedTransferId: string;
+    let transferItemId1: string;
+
+    beforeEach(async () => {
+      const transfer = await TransfersService.createTransfer(
+        {
+          sourceBranchId,
+          destinationBranchId: destBranchId,
+          items: [{ productId: product1Id, requestedQuantity: 20 }],
+        },
+        { id: ownerId, role: "OWNER" }
+      );
+      await TransfersService.approveTransfer(transfer.id, {}, { id: ownerId, role: "OWNER" });
+      await TransfersService.dispatchTransfer(transfer.id, {}, { id: ownerId, role: "OWNER" });
+
+      dispatchedTransferId = transfer.id;
+      const [item] = await db.select().from(transferItems).where(eq(transferItems.transferId, transfer.id));
+      transferItemId1 = item!.id;
+    });
+
+    it("should record discrepancy status and movements when goods are damaged and missing", async () => {
+      // Dispatched 20: 14 good, 4 damaged, 2 missing
+      const res = await TransfersService.receiveTransfer(
+        dispatchedTransferId,
+        {
+          items: [
+            {
+              itemId: transferItemId1,
+              receivedQuantity: 14,
+              damagedQuantity: 4,
+              discrepancyReason: "Box crushed during transit, 2 units missing entirely",
+            },
+          ],
+          notes: "Driver noted damaged package upon arrival",
+        },
+        { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+      );
+
+      expect(res.status).toBe("DISCREPANCY");
+      expect(res.hasDiscrepancy).toBe(true);
+      expect(res.closedById).toBeNull();
+
+      // Destination inventory balances:
+      // Available +14, Damaged +4
+      const [destBalance] = await db
+        .select()
+        .from(inventoryBalances)
+        .where(and(eq(inventoryBalances.branchId, destBranchId), eq(inventoryBalances.productId, product1Id)));
+      expect(destBalance!.availableQuantity).toBe(14);
+      expect(destBalance!.damagedQuantity).toBe(4);
+
+      // Verify transfer_items quantities
+      const [item] = await db.select().from(transferItems).where(eq(transferItems.id, transferItemId1));
+      expect(item!.receivedQuantity).toBe(14);
+      expect(item!.damagedQuantity).toBe(4);
+      expect(item!.missingQuantity).toBe(2);
+      expect(item!.discrepancyReason).toBe("Box crushed during transit, 2 units missing entirely");
+
+      // Verify inventory movements:
+      // 1 TRANSFER_IN for 14
+      const [goodMov] = await db
+        .select()
+        .from(inventoryMovements)
+        .where(and(eq(inventoryMovements.referenceId, dispatchedTransferId), eq(inventoryMovements.movementType, "TRANSFER_IN")));
+      expect(goodMov!.quantity).toBe(14);
+
+      // 1 TRANSFER_DAMAGED for 4
+      const [damagedMov] = await db
+        .select()
+        .from(inventoryMovements)
+        .where(and(eq(inventoryMovements.referenceId, dispatchedTransferId), eq(inventoryMovements.movementType, "TRANSFER_DAMAGED")));
+      expect(damagedMov!.quantity).toBe(4);
+
+      // Missing units (2) do NOT generate destination movements
+      const movements = await db
+        .select()
+        .from(inventoryMovements)
+        .where(eq(inventoryMovements.referenceId, dispatchedTransferId));
+      // Expected movements: 1 TRANSFER_OUT at source (from dispatch), 1 TRANSFER_IN, 1 TRANSFER_DAMAGED at destination
+      expect(movements).toHaveLength(3);
+
+      // Audit event
+      const events = await db.select().from(transferEvents).where(eq(transferEvents.transferId, dispatchedTransferId));
+      expect(events.some((e) => e.eventType === "DISCREPANCY")).toBe(true);
+    });
+
+    it("should require a discrepancy reason when there is damage or shortage", async () => {
+      await expect(
+        TransfersService.receiveTransfer(
+          dispatchedTransferId,
+          {
+            items: [
+              {
+                itemId: transferItemId1,
+                receivedQuantity: 15,
+                damagedQuantity: 0,
+                // no discrepancyReason and no notes
+              },
+            ],
+          },
+          { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+        )
+      ).rejects.toThrow("A discrepancy reason is required when there is damaged or missing stock");
+    });
+
+    it("should reject non-Owner attempting to resolve discrepancy (403)", async () => {
+      // First receive with discrepancy
+      await TransfersService.receiveTransfer(
+        dispatchedTransferId,
+        {
+          items: [
+            {
+              itemId: transferItemId1,
+              receivedQuantity: 18,
+              damagedQuantity: 2,
+              discrepancyReason: "2 units broken",
+            },
+          ],
+        },
+        { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+      );
+
+      // Employee tries to resolve
+      await expect(
+        TransfersService.resolveDiscrepancy(
+          dispatchedTransferId,
+          { resolutionNotes: "Approved write-off" },
+          { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+        )
+      ).rejects.toThrow("Only the Owner can review and resolve transfer discrepancies");
+    });
+
+    it("should allow Owner to resolve discrepancy and close the transfer", async () => {
+      // 1. Receive with discrepancy
+      await TransfersService.receiveTransfer(
+        dispatchedTransferId,
+        {
+          items: [
+            {
+              itemId: transferItemId1,
+              receivedQuantity: 18,
+              damagedQuantity: 2,
+              discrepancyReason: "2 units broken",
+            },
+          ],
+        },
+        { id: destEmployeeId, role: "EMPLOYEE", branchId: destBranchId }
+      );
+
+      // 2. Owner resolves discrepancy
+      const res = await TransfersService.resolveDiscrepancy(
+        dispatchedTransferId,
+        { resolutionNotes: "Carrier reimbursed for broken items. Discrepancy acknowledged." },
+        { id: ownerId, role: "OWNER" }
+      );
+
+      expect(res.status).toBe("COMPLETED");
+      expect(res.discrepancyResolvedById).toBe(ownerId);
+      expect(res.closedById).toBe(ownerId);
+      expect(res.discrepancyResolutionNotes).toBe("Carrier reimbursed for broken items. Discrepancy acknowledged.");
+
+      // Check audit event
+      const events = await db.select().from(transferEvents).where(eq(transferEvents.transferId, dispatchedTransferId));
+      expect(events.some((e) => e.eventType === "DISCREPANCY_RESOLVED")).toBe(true);
+
+      // Attempting to resolve again should fail
+      await expect(
+        TransfersService.resolveDiscrepancy(
+          dispatchedTransferId,
+          { resolutionNotes: "Again" },
+          { id: ownerId, role: "OWNER" }
+        )
+      ).rejects.toThrow('Cannot resolve discrepancy for transfer with status "COMPLETED"');
+    });
+  });
 });
+
