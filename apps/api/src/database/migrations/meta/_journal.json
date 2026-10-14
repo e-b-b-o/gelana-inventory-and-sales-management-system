@@ -127,6 +127,20 @@
       "when": 1791745193108,
       "tag": "0017_thankful_mole_man",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792006736906,
+      "tag": "0018_regular_thanos",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792011454961,
+      "tag": "0019_complete_speedball",
+      "breakpoints": true
     }
   ]
 }

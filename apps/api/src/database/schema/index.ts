@@ -14,3 +14,4 @@ export * from "./sales.js";
 export * from "./returns.js";
 export * from "./saleCorrections.js";
 export * from "./transfers.js";
+export * from "./dailyClosings.js";
