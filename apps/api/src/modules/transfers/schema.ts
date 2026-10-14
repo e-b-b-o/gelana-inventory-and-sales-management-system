@@ -1,6 +1,14 @@
 import { z } from "zod";
 
-export const TransferStatusEnum = z.enum(["REQUESTED", "APPROVED", "REJECTED", "DISPATCHED"]);
+export const TransferStatusEnum = z.enum([
+  "REQUESTED",
+  "APPROVED",
+  "REJECTED",
+  "DISPATCHED",
+  "DISCREPANCY",
+  "COMPLETED",
+  "CANCELLED",
+]);
 export type TransferStatus = z.infer<typeof TransferStatusEnum>;
 
 export const CreateTransferItemSchema = z.object({
@@ -42,6 +50,22 @@ export const DispatchTransferSchema = z.object({
   notes: z.string().max(255).optional(),
 });
 
+export const ReceiveTransferItemSchema = z.object({
+  itemId: z.string().uuid("Invalid item ID"),
+  receivedQuantity: z.number().int("Received quantity must be an integer").min(0, "Received quantity cannot be negative"),
+  damagedQuantity: z.number().int("Damaged quantity must be an integer").min(0, "Damaged quantity cannot be negative").default(0),
+  discrepancyReason: z.string().max(255).optional(),
+});
+
+export const ReceiveTransferSchema = z.object({
+  items: z.array(ReceiveTransferItemSchema).min(1, "At least one item must be received"),
+  notes: z.string().max(255).optional(),
+});
+
+export const ResolveDiscrepancySchema = z.object({
+  resolutionNotes: z.string().min(1, "Resolution notes are required").max(255, "Resolution notes cannot exceed 255 characters"),
+});
+
 export const GetTransfersQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
@@ -57,4 +81,7 @@ export type CreateTransferInput = z.infer<typeof CreateTransferSchema>;
 export type ApproveTransferInput = z.infer<typeof ApproveTransferSchema>;
 export type RejectTransferInput = z.infer<typeof RejectTransferSchema>;
 export type DispatchTransferInput = z.infer<typeof DispatchTransferSchema>;
+export type ReceiveTransferInput = z.infer<typeof ReceiveTransferSchema>;
+export type ResolveDiscrepancyInput = z.infer<typeof ResolveDiscrepancySchema>;
 export type GetTransfersQuery = z.infer<typeof GetTransfersQuerySchema>;
+

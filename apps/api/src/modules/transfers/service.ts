@@ -19,8 +19,12 @@ import {
   DispatchTransferInput,
   DispatchTransferSchema,
   GetTransfersQuery,
+  ReceiveTransferInput,
+  ReceiveTransferSchema,
   RejectTransferInput,
   RejectTransferSchema,
+  ResolveDiscrepancyInput,
+  ResolveDiscrepancySchema,
 } from "./schema.js";
 
 export class TransfersService {
@@ -264,6 +268,15 @@ export class TransfersService {
           columns: { id: true, name: true, email: true },
         },
         dispatchedBy: {
+          columns: { id: true, name: true, email: true },
+        },
+        receivedBy: {
+          columns: { id: true, name: true, email: true },
+        },
+        discrepancyResolvedBy: {
+          columns: { id: true, name: true, email: true },
+        },
+        closedBy: {
           columns: { id: true, name: true, email: true },
         },
         items: {
@@ -603,6 +616,251 @@ export class TransfersService {
         eventType: "DISPATCHED",
         actorId,
         notes: input.notes ? `Dispatched: ${input.notes}` : "Stock dispatched from source branch",
+      });
+
+      return updatedTransfer;
+    });
+  }
+
+  static async receiveTransfer(id: string, rawInput: ReceiveTransferInput, user: any) {
+    const input = ReceiveTransferSchema.parse(rawInput);
+    const actorId = this.getActorId(user);
+
+    return await db.transaction(async (tx) => {
+      // 1. Lock the transfer row for update
+      const [transfer] = await tx
+        .select()
+        .from(transfers)
+        .where(eq(transfers.id, id))
+        .for("update");
+
+      if (!transfer) {
+        throw new AppError("Transfer not found", 404, "NOT_FOUND");
+      }
+
+      // 2. Validate transfer status
+      if (transfer.status !== "DISPATCHED") {
+        throw new AppError(
+          `Cannot receive transfer with status "${transfer.status}". Only DISPATCHED transfers can be received.`,
+          400,
+          "INVALID_STATE_TRANSITION"
+        );
+      }
+
+      // 3. Authorization: Owner can receive any; Employee must be assigned to destination branch
+      if (user.role === "EMPLOYEE") {
+        if (!user.branchId || user.branchId !== transfer.destinationBranchId) {
+          throw new AppError(
+            "Only employees assigned to the destination branch can receive this transfer",
+            403,
+            "AUTHORIZATION_ERROR"
+          );
+        }
+      }
+
+      // 4. Fetch transfer items
+      const items = await tx
+        .select()
+        .from(transferItems)
+        .where(eq(transferItems.transferId, transfer.id));
+
+      if (items.length === 0) {
+        throw new AppError("Transfer has no items to receive", 400, "EMPTY_TRANSFER");
+      }
+
+      const inputItemMap = new Map(input.items.map((i) => [i.itemId, i]));
+
+      // Validate all submitted item IDs belong to this transfer
+      for (const inputItem of input.items) {
+        const itemExists = items.some((i) => i.id === inputItem.itemId);
+        if (!itemExists) {
+          throw new AppError("Invalid item ID in receive payload", 400, "INVALID_ITEM");
+        }
+      }
+
+      let hasDiscrepancy = false;
+      const discrepancyDetails: string[] = [];
+
+      // 5. Process each item: validate quantities, reconcile, record movements
+      for (const item of items) {
+        const inputItem = inputItemMap.get(item.id);
+        if (!inputItem) {
+          throw new AppError(`Missing receiving details for item`, 400, "MISSING_ITEM_RECEIVING");
+        }
+
+        const dispatchedQty = item.dispatchedQuantity ?? 0;
+        const goodQty = inputItem.receivedQuantity;
+        const damagedQty = inputItem.damagedQuantity ?? 0;
+
+        if (goodQty < 0 || damagedQty < 0) {
+          throw new AppError("Received and damaged quantities cannot be negative", 400, "INVALID_QUANTITY");
+        }
+
+        if (goodQty + damagedQty > dispatchedQty) {
+          throw new AppError(
+            `Total accounted quantity (${goodQty + damagedQty}) cannot exceed dispatched quantity (${dispatchedQty})`,
+            400,
+            "EXCESS_QUANTITY_NOT_ALLOWED"
+          );
+        }
+
+        const missingQty = dispatchedQty - (goodQty + damagedQty);
+        const itemHasDiscrepancy = missingQty > 0 || damagedQty > 0;
+
+        let itemReason = (inputItem.discrepancyReason || "").trim();
+        if (itemHasDiscrepancy) {
+          hasDiscrepancy = true;
+          if (!itemReason && input.notes) {
+            itemReason = input.notes.trim();
+          }
+          if (!itemReason) {
+            throw new AppError(
+              `A discrepancy reason is required when there is damaged or missing stock`,
+              400,
+              "DISCREPANCY_REASON_REQUIRED"
+            );
+          }
+          discrepancyDetails.push(
+            `Item ${item.productId}: good=${goodQty}, damaged=${damagedQty}, missing=${missingQty} (Reason: ${itemReason})`
+          );
+        }
+
+        const unitCost = Number(item.sourceUnitCost || 0);
+
+        // Good stock -> TRANSFER_IN to destination available inventory
+        if (goodQty > 0) {
+          await InventoryService.recordMovement({
+            branchId: transfer.destinationBranchId,
+            productId: item.productId,
+            movementType: "TRANSFER_IN",
+            quantity: goodQty,
+            unitCost,
+            referenceId: transfer.id,
+            reason: `Transfer ${transfer.transferNumber} received from source branch`,
+            createdById: actorId,
+            dbTx: tx,
+          });
+        }
+
+        // Damaged stock -> TRANSFER_DAMAGED to destination damaged stock (quarantine)
+        if (damagedQty > 0) {
+          await InventoryService.recordMovement({
+            branchId: transfer.destinationBranchId,
+            productId: item.productId,
+            movementType: "TRANSFER_DAMAGED",
+            quantity: damagedQty,
+            unitCost,
+            referenceId: transfer.id,
+            reason: `Transfer ${transfer.transferNumber} damaged goods quarantined: ${itemReason}`,
+            createdById: actorId,
+            dbTx: tx,
+          });
+        }
+
+        // Update transfer item record with received, damaged, missing, and discrepancyReason
+        await tx
+          .update(transferItems)
+          .set({
+            receivedQuantity: goodQty,
+            damagedQuantity: damagedQty,
+            missingQuantity: missingQty,
+            discrepancyReason: itemReason || null,
+          })
+          .where(eq(transferItems.id, item.id));
+      }
+
+      // 6. Update transfer state
+      const now = new Date().toISOString();
+      const newStatus = hasDiscrepancy ? "DISCREPANCY" : "COMPLETED";
+
+      const [updatedTransfer] = await tx
+        .update(transfers)
+        .set({
+          status: newStatus,
+          receivedById: actorId,
+          receivedAt: now,
+          receivingNotes: input.notes || null,
+          hasDiscrepancy,
+          closedById: hasDiscrepancy ? null : actorId,
+          closedAt: hasDiscrepancy ? null : now,
+          closingNotes: hasDiscrepancy ? null : (input.notes || "Transfer completed in full"),
+          updatedAt: now,
+        })
+        .where(eq(transfers.id, transfer.id))
+        .returning();
+
+      if (!updatedTransfer) {
+        throw new AppError("Failed to update transfer status", 500);
+      }
+
+      // 7. Record audit event in transferEvents
+      await tx.insert(transferEvents).values({
+        transferId: transfer.id,
+        eventType: hasDiscrepancy ? "DISCREPANCY" : "RECEIVED",
+        actorId,
+        notes: hasDiscrepancy
+          ? `Discrepancy recorded during receiving: ${discrepancyDetails.join("; ")}`
+          : (input.notes ? `Received in full: ${input.notes}` : "Stock received in full at destination branch"),
+      });
+
+      return updatedTransfer;
+    });
+  }
+
+  static async resolveDiscrepancy(id: string, rawInput: ResolveDiscrepancyInput, user: any) {
+    const input = ResolveDiscrepancySchema.parse(rawInput);
+    const actorId = this.getActorId(user);
+
+    if (user.role !== "OWNER") {
+      throw new AppError("Only the Owner can review and resolve transfer discrepancies", 403, "AUTHORIZATION_ERROR");
+    }
+
+    return await db.transaction(async (tx) => {
+      // 1. Lock transfer row
+      const [transfer] = await tx
+        .select()
+        .from(transfers)
+        .where(eq(transfers.id, id))
+        .for("update");
+
+      if (!transfer) {
+        throw new AppError("Transfer not found", 404, "NOT_FOUND");
+      }
+
+      if (transfer.status !== "DISCREPANCY") {
+        throw new AppError(
+          `Cannot resolve discrepancy for transfer with status "${transfer.status}". Only transfers with status DISCREPANCY can be resolved.`,
+          400,
+          "INVALID_STATE_TRANSITION"
+        );
+      }
+
+      const now = new Date().toISOString();
+      const [updatedTransfer] = await tx
+        .update(transfers)
+        .set({
+          status: "COMPLETED",
+          discrepancyResolvedById: actorId,
+          discrepancyResolvedAt: now,
+          discrepancyResolutionNotes: input.resolutionNotes,
+          closedById: actorId,
+          closedAt: now,
+          closingNotes: input.resolutionNotes,
+          updatedAt: now,
+        })
+        .where(eq(transfers.id, transfer.id))
+        .returning();
+
+      if (!updatedTransfer) {
+        throw new AppError("Failed to update transfer status", 500);
+      }
+
+      // 2. Audit event
+      await tx.insert(transferEvents).values({
+        transferId: transfer.id,
+        eventType: "DISCREPANCY_RESOLVED",
+        actorId,
+        notes: `Discrepancy resolved: ${input.resolutionNotes}`,
       });
 
       return updatedTransfer;

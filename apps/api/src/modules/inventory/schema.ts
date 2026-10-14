@@ -17,7 +17,7 @@ export const getMovementsQuerySchema = z.object({
   productId: z.string().uuid().optional(),
   movementType: z.enum([
     "OPENING_STOCK", "SALE", "RECEIVING", "ADJUSTMENT", 
-    "TRANSFER_OUT", "TRANSFER_IN", "RETURN_GOOD", "RETURN_DAMAGED", "DISPOSAL"
+    "TRANSFER_OUT", "TRANSFER_IN", "RETURN_GOOD", "RETURN_DAMAGED", "DISPOSAL", "TRANSFER_DAMAGED"
   ]).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
@@ -30,7 +30,7 @@ export type GetMovementsQuery = z.infer<typeof getMovementsQuerySchema>;
 export type RecordMovementParams = {
   branchId: string;
   productId: string;
-  movementType: "OPENING_STOCK" | "SALE" | "RECEIVING" | "ADJUSTMENT" | "TRANSFER_OUT" | "TRANSFER_IN" | "RETURN_GOOD" | "RETURN_DAMAGED" | "DISPOSAL";
+  movementType: "OPENING_STOCK" | "SALE" | "RECEIVING" | "ADJUSTMENT" | "TRANSFER_OUT" | "TRANSFER_IN" | "RETURN_GOOD" | "RETURN_DAMAGED" | "DISPOSAL" | "TRANSFER_DAMAGED";
   quantity: number; // Signed delta
   unitCost: number;
   referenceId?: string;

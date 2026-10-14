@@ -53,4 +53,21 @@ router.post(
   TransfersController.dispatchTransfer
 );
 
+// Receive transfer: Owner or authorized Employee of destination branch
+router.post(
+  "/:id/receive",
+  authenticate,
+  authorizeRole(["OWNER", "EMPLOYEE"]),
+  TransfersController.receiveTransfer
+);
+
+// Resolve discrepancy: strictly OWNER only
+router.post(
+  "/:id/resolve-discrepancy",
+  authenticate,
+  authorizeRole(["OWNER"]),
+  TransfersController.resolveDiscrepancy
+);
+
 export const transfersRouter = router;
+

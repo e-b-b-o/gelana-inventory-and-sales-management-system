@@ -4,7 +4,9 @@ import {
   CreateTransferSchema,
   DispatchTransferSchema,
   GetTransfersQuerySchema,
+  ReceiveTransferSchema,
   RejectTransferSchema,
+  ResolveDiscrepancySchema,
 } from "./schema.js";
 import { TransfersService } from "./service.js";
 
@@ -107,4 +109,43 @@ export class TransfersController {
       next(error);
     }
   }
+
+  static async receiveTransfer(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const input = ReceiveTransferSchema.parse(req.body);
+      const user = req.user;
+
+      const result = await TransfersService.receiveTransfer(id as string, input, user);
+
+      res.status(200).json({
+        status: "success",
+        message: result.hasDiscrepancy
+          ? "Transfer received with discrepancies recorded."
+          : "Transfer received and completed successfully.",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async resolveDiscrepancy(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const input = ResolveDiscrepancySchema.parse(req.body);
+      const user = req.user;
+
+      const result = await TransfersService.resolveDiscrepancy(id as string, input, user);
+
+      res.status(200).json({
+        status: "success",
+        message: "Discrepancy resolved and transfer closed successfully.",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

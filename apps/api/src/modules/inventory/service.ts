@@ -3,7 +3,7 @@ import { products, inventoryBalances, categories } from "../../database/schema/i
 import { eq, and, ilike, or } from "drizzle-orm";
 import { AppError } from "../../utils/errors.js";
 import { GetBalancesQuery, GetMovementsQuery, RecordMovementParams, CreateOpeningStockInput, CreateAdjustmentInput, SubmitStocktakeInput, CreateDisposalInput } from "./schema.js";
-import { inventoryMovements, movementTypeEnum } from "../../database/schema/inventoryMovements.js";
+import { inventoryMovements } from "../../database/schema/inventoryMovements.js";
 import { sql } from "drizzle-orm";
 
 export class InventoryService {
@@ -173,12 +173,15 @@ export class InventoryService {
           break;
         case "DISPOSAL":
         case "RETURN_DAMAGED":
+        case "TRANSFER_DAMAGED":
           newDamaged += quantity;
           break;
         case "TRANSFER_IN":
-          // Special case: completes a transfer. quantity is added to available, subtracted from inTransit
+          // Special case: completes a transfer. quantity is added to available, subtracted from inTransit if tracked
           newAvailable += quantity;
-          newInTransit -= quantity;
+          if (newInTransit >= quantity) {
+            newInTransit -= quantity;
+          }
           break;
       }
 
