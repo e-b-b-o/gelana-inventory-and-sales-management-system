@@ -9,6 +9,8 @@ export async function getUserForSession(id: string) {
   const found = await db
     .select({
       id: users.id,
+      name: users.name,
+      email: users.email,
       isActive: users.isActive,
       role: users.role,
       branchId: users.branchId,

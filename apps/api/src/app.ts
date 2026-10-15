@@ -19,6 +19,11 @@ import { salesRoutes } from "./modules/sales/routes.js";
 import { returnsRouter } from "./modules/returns/routes.js";
 import { transfersRouter } from "./modules/transfers/routes.js";
 import { closingRouter } from "./modules/closing/routes.js";
+import { dashboardRouter } from "./modules/dashboard/routes.js";
+import { reportsRouter } from "./modules/reports/routes.js";
+import { notificationsRouter } from "./modules/notifications/routes.js";
+import { auditRouter } from "./modules/audit/routes.js";
+import { settingsRouter } from "./modules/settings/routes.js";
 
 export const app = express();
 
@@ -26,10 +31,10 @@ export const app = express();
 const ALLOWED_ORIGINS = ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"];
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many requests , please try again later" },
+  message: { error: { code: "RATE_LIMIT_EXCEEDED", message: "Too many requests, please try again later" } },
 });
 
 app.use(helmet());
@@ -70,5 +75,10 @@ app.use("/api/v1/sales", salesRoutes);
 app.use("/api/v1/returns", returnsRouter);
 app.use("/api/v1/transfers", transfersRouter);
 app.use("/api/v1/closings", closingRouter);
+app.use("/api/v1/dashboard", dashboardRouter);
+app.use("/api/v1/reports", reportsRouter);
+app.use("/api/v1/notifications", notificationsRouter);
+app.use("/api/v1/audit-logs", auditRouter);
+app.use("/api/v1/settings", settingsRouter);
 
 app.use(errorHandler);
