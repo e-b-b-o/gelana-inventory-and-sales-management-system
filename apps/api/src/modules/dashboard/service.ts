@@ -1,0 +1,830 @@
+import { sql, eq, and, desc, gte, lte, or } from "drizzle-orm";
+import { db } from "../../config/database.js";
+import {
+  branches,
+  sales,
+  inventoryBalances,
+  transfers,
+  dailyClosings,
+  receivings,
+  salesReturns,
+} from "../../database/schema/index.js";
+import { AppError } from "../../utils/errors.js";
+import { GetOwnerDashboardQuery, GetEmployeeDashboardQuery } from "./schema.js";
+
+// Helper: formats a Date to YYYY-MM-DD
+function toDateString(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export class DashboardService {
+  /**
+   * Slice 10.1 — Owner Dashboard
+   * Aggregates authoritative business-wide metrics or filtered by branch.
+   */
+  static async getOwnerDashboard(query: GetOwnerDashboardQuery) {
+    const today = new Date();
+    const todayStr = toDateString(today);
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const { branchId, trendRange } = query;
+
+    // 1. Validate branch if supplied
+    let branchName = "All Branches";
+    if (branchId) {
+      const branchRecord = await db.query.branches.findFirst({
+        where: eq(branches.id, branchId),
+      });
+      if (!branchRecord) {
+        throw new AppError("Branch not found", 404, "NOT_FOUND");
+      }
+      branchName = branchRecord.name;
+    }
+
+    // 2. Fetch all active branches
+    const allBranches = await db.query.branches.findMany({
+      where: eq(branches.isActive, true),
+      orderBy: [branches.name],
+    });
+
+    // 3. Sales KPI: Today's completed sales
+    const salesFilter = and(
+      eq(sales.status, "COMPLETED"),
+      gte(sales.soldAt, startOfToday.toISOString()),
+      lte(sales.soldAt, endOfToday.toISOString()),
+      branchId ? eq(sales.branchId, branchId) : undefined
+    );
+
+    const completedSalesToday = await db.query.sales.findMany({
+      where: salesFilter,
+      columns: {
+        id: true,
+        grandTotal: true,
+        branchId: true,
+        soldAt: true,
+      },
+    });
+
+    let todaySalesTotal = 0;
+    for (const s of completedSalesToday) {
+      todaySalesTotal += Number(s.grandTotal);
+    }
+    const todayTransactionsCount = completedSalesToday.length;
+
+    // 4. Inventory Valuation & Thresholds KPI
+    const balances = await db.query.inventoryBalances.findMany({
+      where: branchId ? eq(inventoryBalances.branchId, branchId) : undefined,
+      with: {
+        branch: true,
+        product: true,
+      },
+    });
+
+    let inventoryValuation = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+    const lowStockBranchMap = new Map<string, number>();
+    const outOfStockBranchMap = new Map<string, number>();
+
+    for (const b of balances) {
+      const avail = b.availableQuantity;
+      const minStock = b.minimumStockQuantity;
+      const wac = Number(b.wac || 0);
+
+      if (avail > 0) {
+        inventoryValuation += avail * wac;
+      }
+
+      if (avail <= 0) {
+        outOfStockCount++;
+        const current = outOfStockBranchMap.get(b.branch.name) || 0;
+        outOfStockBranchMap.set(b.branch.name, current + 1);
+      } else if (avail <= minStock) {
+        lowStockCount++;
+        const current = lowStockBranchMap.get(b.branch.name) || 0;
+        lowStockBranchMap.set(b.branch.name, current + 1);
+      }
+    }
+
+    // Impacted branches summary string
+    const impactedBranches = new Set([
+      ...lowStockBranchMap.keys(),
+      ...outOfStockBranchMap.keys(),
+    ]);
+    const impactedSummary =
+      impactedBranches.size > 0
+        ? Array.from(impactedBranches).join(" & ") + " Impacted"
+        : "All branches normal";
+
+    // 5. Level 1: Action Required — Critical Discrepancies & Transfer Approvals
+    // 5a. Critical Closings: Closings that are SUBMITTED or have non-zero variance
+    const closingFilter = branchId
+      ? and(
+          eq(dailyClosings.branchId, branchId),
+          or(
+            eq(dailyClosings.status, "SUBMITTED"),
+            sql`ABS(COALESCE(${dailyClosings.cashDifference}, 0)) > 0`
+          )
+        )
+      : or(
+          eq(dailyClosings.status, "SUBMITTED"),
+          sql`ABS(COALESCE(${dailyClosings.cashDifference}, 0)) > 0`
+        );
+
+    const pendingOrDiscrepantClosings = await db.query.dailyClosings.findMany({
+      where: closingFilter,
+      with: {
+        branch: true,
+      },
+      orderBy: [desc(dailyClosings.createdAt)],
+      limit: 10,
+    });
+
+    const closingDiscrepancyItems = pendingOrDiscrepantClosings.map((c) => ({
+      closingId: c.id,
+      closingNumber: c.closingNumber,
+      branchId: c.branchId,
+      branchName: c.branch.name,
+      closingDate: c.closingDate,
+      expectedCash: Number(c.expectedCash),
+      actualCash: c.actualCash !== null ? Number(c.actualCash) : null,
+      cashDifference: c.cashDifference !== null ? Number(c.cashDifference) : 0,
+      status: c.status,
+      discrepancyReason: c.discrepancyReason,
+      submittedAt: c.submittedAt,
+    }));
+
+    // 5b. Transfer Approvals: transfers with status 'REQUESTED'
+    const transferFilter = and(
+      eq(transfers.status, "REQUESTED"),
+      branchId
+        ? or(
+            eq(transfers.sourceBranchId, branchId),
+            eq(transfers.destinationBranchId, branchId)
+          )
+        : undefined
+    );
+
+    const pendingTransfers = await db.query.transfers.findMany({
+      where: transferFilter,
+      with: {
+        items: {
+          with: {
+            product: true,
+          },
+        },
+      },
+      orderBy: [desc(transfers.createdAt)],
+      limit: 10,
+    });
+
+    // Fetch branch names for transfers
+    const branchNameMap = new Map<string, string>();
+    allBranches.forEach((b) => branchNameMap.set(b.id, b.name));
+
+    const transferApprovalItems = pendingTransfers.map((t) => {
+      const topItem = t.items[0];
+      const summaryText = topItem
+        ? `${branchNameMap.get(t.sourceBranchId) || "Source"} → ${branchNameMap.get(t.destinationBranchId) || "Destination"} (${topItem.product.name} • ${topItem.requestedQuantity} units)`
+        : `${branchNameMap.get(t.sourceBranchId) || "Source"} → ${branchNameMap.get(t.destinationBranchId) || "Destination"}`;
+
+      return {
+        transferId: t.id,
+        transferNumber: t.transferNumber,
+        sourceBranchName: branchNameMap.get(t.sourceBranchId) || "Source",
+        destinationBranchName: branchNameMap.get(t.destinationBranchId) || "Destination",
+        itemsCount: t.items.length,
+        summary: summaryText,
+        createdAt: t.createdAt,
+      };
+    });
+
+    // 6. Level 3: Multi-Branch Performance Overview Table
+    // Today's closings for each branch
+    const todaysClosings = await db.query.dailyClosings.findMany({
+      where: eq(dailyClosings.closingDate, todayStr),
+    });
+    const closingByBranchMap = new Map<string, typeof todaysClosings[0]>();
+    todaysClosings.forEach((c) => closingByBranchMap.set(c.branchId, c));
+
+    // Branch performance rows
+    const branchesToShow = branchId
+      ? allBranches.filter((b) => b.id === branchId)
+      : allBranches;
+
+    const branchPerformance = branchesToShow.map((b) => {
+      // Sales for this branch today
+      const branchSales = completedSalesToday.filter((s) => s.branchId === b.id);
+      let salesAmount = 0;
+      for (const s of branchSales) {
+        salesAmount += Number(s.grandTotal);
+      }
+
+      // Stock status for this branch
+      const branchBalances = balances.filter((bal) => bal.branchId === b.id);
+      let bLow = 0;
+      let bOut = 0;
+      for (const bal of branchBalances) {
+        if (bal.availableQuantity <= 0) bOut++;
+        else if (bal.availableQuantity <= bal.minimumStockQuantity) bLow++;
+      }
+
+      // Closing status
+      const closing = closingByBranchMap.get(b.id);
+      const closingStatus = closing
+        ? (closing.status as "NOT_SUBMITTED" | "SUBMITTED" | "APPROVED" | "REJECTED")
+        : "NOT_SUBMITTED";
+
+      return {
+        branchId: b.id,
+        branchName: b.name,
+        branchCode: b.code,
+        todaySales: salesAmount,
+        todayTransactions: branchSales.length,
+        lowStockCount: bLow,
+        outOfStockCount: bOut,
+        closingStatus,
+        closingDiscrepancy: closing?.cashDifference ? Number(closing.cashDifference) : null,
+        closingId: closing?.id || null,
+      };
+    });
+
+    // 7. Level 4: Sales Trend
+    // Generate intervals based on trendRange: "today" (hourly), "7days" (daily), "month" (daily)
+    let intervals: Array<{ label: string; salesAmount: number; transactionCount: number }> = [];
+
+    if (trendRange === "today") {
+      // Hourly intervals 09:00 through 18:00
+      const hours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+      const hourMap = new Map<number, { amount: number; count: number }>();
+      hours.forEach((h) => hourMap.set(h, { amount: 0, count: 0 }));
+
+      for (const s of completedSalesToday) {
+        const d = new Date(s.soldAt);
+        const h = d.getHours();
+        if (hourMap.has(h)) {
+          const curr = hourMap.get(h)!;
+          curr.amount += Number(s.grandTotal);
+          curr.count += 1;
+        }
+      }
+
+      intervals = hours.map((h) => {
+        const val = hourMap.get(h)!;
+        return {
+          label: `${String(h).padStart(2, "0")}:00`,
+          salesAmount: Math.round(val.amount * 100) / 100,
+          transactionCount: val.count,
+        };
+      });
+    } else if (trendRange === "7days") {
+      // Last 7 days daily intervals
+      const dayMap = new Map<string, { label: string; amount: number; count: number }>();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const dStr = toDateString(d);
+        const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        dayMap.set(dStr, { label, amount: 0, count: 0 });
+      }
+
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 6);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+
+      const past7Sales = await db.query.sales.findMany({
+        where: and(
+          eq(sales.status, "COMPLETED"),
+          gte(sales.soldAt, sevenDaysAgo.toISOString()),
+          lte(sales.soldAt, endOfToday.toISOString()),
+          branchId ? eq(sales.branchId, branchId) : undefined
+        ),
+        columns: {
+          grandTotal: true,
+          soldAt: true,
+        },
+      });
+
+      for (const s of past7Sales) {
+        const dStr = toDateString(new Date(s.soldAt));
+        if (dayMap.has(dStr)) {
+          const curr = dayMap.get(dStr)!;
+          curr.amount += Number(s.grandTotal);
+          curr.count += 1;
+        }
+      }
+
+      intervals = Array.from(dayMap.values()).map((v) => ({
+        label: v.label,
+        salesAmount: Math.round(v.amount * 100) / 100,
+        transactionCount: v.count,
+      }));
+    } else {
+      // This Month daily intervals
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const dayMap = new Map<string, { label: string; amount: number; count: number }>();
+      const temp = new Date(startOfMonth);
+      while (temp <= endOfToday) {
+        const dStr = toDateString(temp);
+        const label = temp.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        dayMap.set(dStr, { label, amount: 0, count: 0 });
+        temp.setDate(temp.getDate() + 1);
+      }
+
+      const monthSales = await db.query.sales.findMany({
+        where: and(
+          eq(sales.status, "COMPLETED"),
+          gte(sales.soldAt, startOfMonth.toISOString()),
+          lte(sales.soldAt, endOfToday.toISOString()),
+          branchId ? eq(sales.branchId, branchId) : undefined
+        ),
+        columns: {
+          grandTotal: true,
+          soldAt: true,
+        },
+      });
+
+      for (const s of monthSales) {
+        const dStr = toDateString(new Date(s.soldAt));
+        if (dayMap.has(dStr)) {
+          const curr = dayMap.get(dStr)!;
+          curr.amount += Number(s.grandTotal);
+          curr.count += 1;
+        }
+      }
+
+      intervals = Array.from(dayMap.values()).map((v) => ({
+        label: v.label,
+        salesAmount: Math.round(v.amount * 100) / 100,
+        transactionCount: v.count,
+      }));
+    }
+
+    let trendTotal = 0;
+    let peakLabel: string | null = null;
+    let peakAmount = 0;
+    for (const item of intervals) {
+      trendTotal += item.salesAmount;
+      if (item.salesAmount > peakAmount) {
+        peakAmount = item.salesAmount;
+        peakLabel = item.label;
+      }
+    }
+
+    // 8. Recent Business Activity (last 10 items across sales, receivings, transfers, closings, returns)
+    type ActivityItem = {
+      id: string;
+      type: "SALE" | "RECEIVING" | "TRANSFER" | "CLOSING" | "RETURN";
+      referenceNumber: string;
+      title: string;
+      branchName: string;
+      timestamp: string;
+      amount: number | null;
+      subtitle: string;
+      badgeText?: string | null;
+    };
+
+    const activities: ActivityItem[] = [];
+
+    // Recent 5 sales
+    const recentSales = await db.query.sales.findMany({
+      where: and(
+        eq(sales.status, "COMPLETED"),
+        branchId ? eq(sales.branchId, branchId) : undefined
+      ),
+      with: {
+        branch: true,
+      },
+      orderBy: [desc(sales.soldAt)],
+      limit: 5,
+    });
+    for (const s of recentSales) {
+      activities.push({
+        id: s.id,
+        type: "SALE",
+        referenceNumber: s.saleNumber,
+        title: `${s.saleNumber} recorded`,
+        branchName: s.branch.name,
+        timestamp: s.soldAt,
+        amount: Number(s.grandTotal),
+        subtitle: `${s.branch.name}`,
+      });
+    }
+
+    // Recent 5 receivings
+    const recentReceivings = await db.query.receivings.findMany({
+      where: branchId ? eq(receivings.branchId, branchId) : undefined,
+      with: {
+        branch: true,
+        items: {
+          with: {
+            product: true,
+          },
+        },
+      },
+      orderBy: [desc(receivings.createdAt)],
+      limit: 5,
+    });
+    for (const r of recentReceivings) {
+      const firstItem = r.items[0];
+      activities.push({
+        id: r.id,
+        type: "RECEIVING",
+        referenceNumber: r.receivingNumber,
+        title: `${r.receivingNumber} received`,
+        branchName: r.branch.name,
+        timestamp: r.createdAt,
+        amount: null,
+        subtitle: firstItem
+          ? `${firstItem.product.name} • ${r.branch.name}`
+          : r.branch.name,
+        badgeText: firstItem ? `${firstItem.quantity} units` : null,
+      });
+    }
+
+    // Recent 5 transfers
+    const recentTransfers = await db.query.transfers.findMany({
+      where: branchId
+        ? or(
+            eq(transfers.sourceBranchId, branchId),
+            eq(transfers.destinationBranchId, branchId)
+          )
+        : undefined,
+      orderBy: [desc(transfers.createdAt)],
+      limit: 5,
+    });
+    for (const t of recentTransfers) {
+      const srcName = branchNameMap.get(t.sourceBranchId) || "Branch";
+      const dstName = branchNameMap.get(t.destinationBranchId) || "Branch";
+      activities.push({
+        id: t.id,
+        type: "TRANSFER",
+        referenceNumber: t.transferNumber,
+        title: `${t.transferNumber} (${t.status.toLowerCase()})`,
+        branchName: srcName,
+        timestamp: t.createdAt,
+        amount: null,
+        subtitle: `${srcName} → ${dstName}`,
+        badgeText: t.status,
+      });
+    }
+
+    // Recent 5 closings
+    const recentClosings = await db.query.dailyClosings.findMany({
+      where: branchId ? eq(dailyClosings.branchId, branchId) : undefined,
+      with: {
+        branch: true,
+      },
+      orderBy: [desc(dailyClosings.createdAt)],
+      limit: 5,
+    });
+    for (const c of recentClosings) {
+      activities.push({
+        id: c.id,
+        type: "CLOSING",
+        referenceNumber: c.closingNumber,
+        title: `${c.closingNumber} ${c.status.toLowerCase()}`,
+        branchName: c.branch.name,
+        timestamp: c.submittedAt || c.createdAt,
+        amount: c.actualCash !== null ? Number(c.actualCash) : Number(c.expectedCash),
+        subtitle: `${c.branch.name} • Discrepancy: ${Number(c.cashDifference || 0).toFixed(2)}`,
+        badgeText: c.status,
+      });
+    }
+
+    // Recent 5 returns
+    const recentReturns = await db.query.salesReturns.findMany({
+      where: branchId ? eq(salesReturns.branchId, branchId) : undefined,
+      with: {
+        branch: true,
+        items: {
+          with: {
+            product: true,
+          },
+        },
+      },
+      orderBy: [desc(salesReturns.returnedAt)],
+      limit: 5,
+    });
+    for (const ret of recentReturns) {
+      const topItem = ret.items[0];
+      activities.push({
+        id: ret.id,
+        type: "RETURN",
+        referenceNumber: ret.returnNumber,
+        title: `${ret.returnNumber} recorded`,
+        branchName: ret.branch.name,
+        timestamp: ret.returnedAt,
+        amount: Number(ret.refundAmount),
+        subtitle: topItem
+          ? `${ret.branch.name} • ${topItem.product.name}`
+          : ret.branch.name,
+        badgeText: topItem ? topItem.condition : null,
+      });
+    }
+
+    // Sort combined activities descending by timestamp and take top 10
+    activities.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    const topActivities = activities.slice(0, 10);
+
+    return {
+      branchId: branchId || null,
+      branchName,
+      businessDate: todayStr,
+      kpis: {
+        todaySales: Math.round(todaySalesTotal * 100) / 100,
+        todayTransactions: todayTransactionsCount,
+        inventoryValuation: Math.round(inventoryValuation * 100) / 100,
+        lowStockCount,
+        outOfStockCount,
+      },
+      actionRequired: {
+        closingDiscrepancy: {
+          count: closingDiscrepancyItems.length,
+          items: closingDiscrepancyItems,
+        },
+        transferApprovals: {
+          count: transferApprovalItems.length,
+          items: transferApprovalItems,
+        },
+        stockThresholds: {
+          lowStockCount,
+          outOfStockCount,
+          impactedBranchesSummary: impactedSummary,
+        },
+      },
+      branchPerformance,
+      salesTrend: {
+        range: trendRange,
+        intervals,
+        totalAmount: Math.round(trendTotal * 100) / 100,
+        peakLabel,
+        peakAmount: Math.round(peakAmount * 100) / 100,
+      },
+      recentActivities: topActivities,
+    };
+  }
+
+  /**
+   * Slice 10.2 — Employee Dashboard
+   * Branch-scoped operational overview strictly omitting purchase cost, WAC, and gross profit.
+   */
+  static async getEmployeeDashboard(
+    query: GetEmployeeDashboardQuery,
+    user: { id: string; role: string; branchId: string | null }
+  ) {
+    const today = new Date();
+    const todayStr = toDateString(today);
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // 1. Determine and strictly validate branch scope
+    let branchId = user.branchId;
+
+    if (user.role === "OWNER") {
+      // Owner previewing employee dashboard for a branch
+      if (query.branchId) {
+        branchId = query.branchId;
+      } else {
+        const firstBranch = await db.query.branches.findFirst({
+          where: eq(branches.isActive, true),
+        });
+        branchId = firstBranch?.id || null;
+      }
+    } else {
+      // Employee: strictly locked to user's assigned branch
+      if (query.branchId && query.branchId !== user.branchId) {
+        throw new AppError(
+          "You do not have permission to access another branch's dashboard",
+          403,
+          "AUTHORIZATION_ERROR"
+        );
+      }
+      if (!branchId) {
+        throw new AppError(
+          "Employee is not assigned to a branch",
+          400,
+          "NO_BRANCH_ASSIGNED"
+        );
+      }
+    }
+
+    if (!branchId) {
+      throw new AppError("No branch found", 404, "NOT_FOUND");
+    }
+
+    const branch = await db.query.branches.findFirst({
+      where: eq(branches.id, branchId),
+    });
+    if (!branch) {
+      throw new AppError("Branch not found", 404, "NOT_FOUND");
+    }
+
+    // 2. Today's Branch Sales & Employee's Own Sales (No costs/profit!)
+    const branchSalesToday = await db.query.sales.findMany({
+      where: and(
+        eq(sales.branchId, branchId),
+        eq(sales.status, "COMPLETED"),
+        gte(sales.soldAt, startOfToday.toISOString()),
+        lte(sales.soldAt, endOfToday.toISOString())
+      ),
+      columns: {
+        id: true,
+        grandTotal: true,
+        createdById: true,
+      },
+    });
+
+    let todayBranchSales = 0;
+    let todayOwnSales = 0;
+    let todayOwnTransactions = 0;
+
+    for (const s of branchSalesToday) {
+      const amt = Number(s.grandTotal);
+      todayBranchSales += amt;
+      if (s.createdById === user.id) {
+        todayOwnSales += amt;
+        todayOwnTransactions += 1;
+      }
+    }
+
+    // 3. Branch Inventory Alerts (Zero cost, Zero WAC!)
+    const branchBalances = await db.query.inventoryBalances.findMany({
+      where: eq(inventoryBalances.branchId, branchId),
+      with: {
+        product: {
+          with: {
+            category: true,
+          },
+        },
+      },
+    });
+
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+    const stockAlerts: Array<{
+      productId: string;
+      productName: string;
+      sku: string;
+      categoryName: string;
+      availableQuantity: number;
+      minimumStockQuantity: number;
+      status: "LOW_STOCK" | "OUT_OF_STOCK";
+    }> = [];
+
+    for (const b of branchBalances) {
+      const avail = b.availableQuantity;
+      const minStock = b.minimumStockQuantity;
+
+      if (avail <= 0) {
+        outOfStockCount++;
+        stockAlerts.push({
+          productId: b.productId,
+          productName: b.product.name,
+          sku: b.product.sku,
+          categoryName: b.product.category?.name || "General",
+          availableQuantity: avail,
+          minimumStockQuantity: minStock,
+          status: "OUT_OF_STOCK",
+        });
+      } else if (avail <= minStock) {
+        lowStockCount++;
+        stockAlerts.push({
+          productId: b.productId,
+          productName: b.product.name,
+          sku: b.product.sku,
+          categoryName: b.product.category?.name || "General",
+          availableQuantity: avail,
+          minimumStockQuantity: minStock,
+          status: "LOW_STOCK",
+        });
+      }
+    }
+
+    // Sort alerts: OUT_OF_STOCK first, then LOW_STOCK
+    stockAlerts.sort((a, b) => {
+      if (a.status === "OUT_OF_STOCK" && b.status !== "OUT_OF_STOCK") return -1;
+      if (a.status !== "OUT_OF_STOCK" && b.status === "OUT_OF_STOCK") return 1;
+      return a.availableQuantity - b.availableQuantity;
+    });
+
+    // 4. Daily Closing Status for today at this branch
+    const todaysClosing = await db.query.dailyClosings.findFirst({
+      where: and(
+        eq(dailyClosings.branchId, branchId),
+        eq(dailyClosings.closingDate, todayStr)
+      ),
+    });
+
+    let nextAction = "Submit Daily Closing at end of trading day";
+    if (todaysClosing) {
+      if (todaysClosing.status === "SUBMITTED") {
+        nextAction = "Awaiting Owner review and approval";
+      } else if (todaysClosing.status === "APPROVED") {
+        nextAction = "Daily Closing approved. Trading day locked.";
+      } else if (todaysClosing.status === "REJECTED") {
+        nextAction = "Closing rejected by Owner. Corrections required before resubmission.";
+      }
+    }
+
+    const dailyClosingInfo = {
+      closingId: todaysClosing?.id || null,
+      closingNumber: todaysClosing?.closingNumber || null,
+      status: (todaysClosing?.status as "NOT_SUBMITTED" | "SUBMITTED" | "APPROVED" | "REJECTED") || "NOT_SUBMITTED",
+      expectedCash: todaysClosing ? Number(todaysClosing.expectedCash) : 0,
+      actualCash: todaysClosing?.actualCash !== null && todaysClosing?.actualCash !== undefined
+        ? Number(todaysClosing.actualCash)
+        : null,
+      cashDifference: todaysClosing?.cashDifference !== null && todaysClosing?.cashDifference !== undefined
+        ? Number(todaysClosing.cashDifference)
+        : null,
+      nextAction,
+      rejectionReason: todaysClosing?.rejectionReason || null,
+    };
+
+    // 5. Pending Transfers relevant to this branch
+    // Dispatched inbound transfers waiting for receipt
+    const inboundDispatched = await db.query.transfers.findMany({
+      where: and(
+        eq(transfers.destinationBranchId, branchId),
+        eq(transfers.status, "DISPATCHED")
+      ),
+      with: {
+        items: true,
+      },
+      orderBy: [desc(transfers.dispatchedAt)],
+      limit: 5,
+    });
+
+    const allBranchList = await db.query.branches.findMany();
+    const branchNameMap = new Map<string, string>();
+    allBranchList.forEach((b) => branchNameMap.set(b.id, b.name));
+
+    const pendingTransferItems = inboundDispatched.map((t) => ({
+      transferId: t.id,
+      transferNumber: t.transferNumber,
+      sourceBranchName: branchNameMap.get(t.sourceBranchId) || "Source Branch",
+      status: t.status,
+      createdAt: t.createdAt,
+      dispatchedAt: t.dispatchedAt,
+      itemsCount: t.items.length,
+    }));
+
+    // 6. Recent Sales at Branch (top 10)
+    const recentBranchSales = await db.query.sales.findMany({
+      where: and(
+        eq(sales.branchId, branchId),
+        eq(sales.status, "COMPLETED")
+      ),
+      with: {
+        createdBy: true,
+      },
+      orderBy: [desc(sales.soldAt)],
+      limit: 10,
+    });
+
+    const recentSales = recentBranchSales.map((s) => ({
+      id: s.id,
+      saleNumber: s.saleNumber,
+      soldAt: s.soldAt,
+      cashierName: s.createdBy?.name || "Cashier",
+      isOwnSale: s.createdById === user.id,
+      grandTotal: Number(s.grandTotal),
+      status: s.status,
+    }));
+
+    return {
+      branchId,
+      branchName: branch.name,
+      branchCode: branch.code,
+      businessDate: todayStr,
+      kpis: {
+        todayBranchSales: Math.round(todayBranchSales * 100) / 100,
+        todayBranchTransactions: branchSalesToday.length,
+        todayOwnSales: Math.round(todayOwnSales * 100) / 100,
+        todayOwnTransactions,
+        lowStockCount,
+        outOfStockCount,
+      },
+      dailyClosing: dailyClosingInfo,
+      pendingTransfers: {
+        inboundDispatchedCount: inboundDispatched.length,
+        items: pendingTransferItems,
+      },
+      recentSales,
+      stockAlerts,
+    };
+  }
+}
