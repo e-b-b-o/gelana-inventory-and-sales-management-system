@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ProductsService } from "./service.js";
 import { db } from "../../config/database.js";
-import { products } from "../../database/schema/products.js";
-import { categories } from "../../database/schema/categories.js";
 
 vi.mock("../../config/database.js", () => ({
   db: {
@@ -11,6 +9,11 @@ vi.mock("../../config/database.js", () => ({
     update: vi.fn(),
     execute: vi.fn(),
     transaction: vi.fn(),
+    query: {
+      products: {
+        findMany: vi.fn(),
+      },
+    },
   },
 }));
 
@@ -112,4 +115,54 @@ describe("ProductsService", () => {
       expect(result).toEqual(mockUpdatedProduct);
     });
   });
+
+  describe("getProducts", () => {
+    it("should return deduplicated products with single active selling price", async () => {
+      const mockDbProducts = [
+        {
+          id: "prod-1",
+          sku: "PRD-000001",
+          name: "Notebook",
+          categoryId: "cat-1",
+          brand: "Gelana",
+          description: "A notebook",
+          imageUrl: null,
+          isActive: true,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          category: { name: "Stationery" },
+          units: [
+            {
+              id: "unit-1",
+              name: "Piece",
+              isBase: true,
+              prices: [{ id: "price-1", sellingPrice: "120.00" }],
+            },
+          ],
+        },
+      ];
+
+      vi.mocked(db.query.products.findMany).mockResolvedValue(mockDbProducts as any);
+
+      const result = await service.getProducts();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        id: "prod-1",
+        sku: "PRD-000001",
+        name: "Notebook",
+        categoryId: "cat-1",
+        categoryName: "Stationery",
+        brand: "Gelana",
+        description: "A notebook",
+        imageUrl: null,
+        unit: "Piece",
+        defaultSellingPrice: "120.00",
+        isActive: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      });
+    });
+  });
 });
+

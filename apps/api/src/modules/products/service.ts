@@ -9,35 +9,44 @@ export class ProductsService {
   async getProducts() {
     const { productUnits } = await import("../../database/schema/productUnits.js");
     const { productPrices } = await import("../../database/schema/productPrices.js");
-    const { eq, and, isNull } = await import("drizzle-orm");
+    const { eq, isNull, desc } = await import("drizzle-orm");
 
-    return await db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        name: products.name,
-        categoryId: products.categoryId,
-        categoryName: categories.name,
-        brand: products.brand,
-        description: products.description,
-        imageUrl: products.imageUrl,
-        unit: productUnits.name,
-        defaultSellingPrice: productPrices.sellingPrice,
-        isActive: products.isActive,
-        createdAt: products.createdAt,
-        updatedAt: products.updatedAt,
-      })
-      .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .leftJoin(
-        productUnits,
-        and(eq(products.id, productUnits.productId), eq(productUnits.isBase, true))
-      )
-      .leftJoin(
-        productPrices,
-        and(eq(productUnits.id, productPrices.productUnitId), isNull(productPrices.effectiveUntil))
-      )
-      .orderBy(products.createdAt);
+    const rows = await db.query.products.findMany({
+      orderBy: [products.createdAt],
+      with: {
+        category: true,
+        units: {
+          where: eq(productUnits.isBase, true),
+          with: {
+            prices: {
+              where: isNull(productPrices.effectiveUntil),
+              orderBy: [desc(productPrices.effectiveFrom), desc(productPrices.id)],
+              limit: 1,
+            },
+          },
+        },
+      },
+    });
+
+    return rows.map((p: any) => {
+      const baseUnit = p.units?.[0];
+      const activePrice = baseUnit?.prices?.[0];
+      return {
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        categoryId: p.categoryId,
+        categoryName: p.category?.name || null,
+        brand: p.brand,
+        description: p.description,
+        imageUrl: p.imageUrl,
+        unit: baseUnit?.name || null,
+        defaultSellingPrice: activePrice?.sellingPrice || null,
+        isActive: p.isActive,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      };
+    });
   }
 
   async createProduct(data: CreateProductInput) {
@@ -362,7 +371,7 @@ export class ProductsService {
 
   async getProductUnitPrices(productId: string, unitId: string) {
     const { productPrices } = await import("../../database/schema/productPrices.js");
-    const { eq, and } = await import("drizzle-orm");
+    const { eq } = await import("drizzle-orm");
 
     return await db
       .select({
