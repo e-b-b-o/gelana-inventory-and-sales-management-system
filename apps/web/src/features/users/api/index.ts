@@ -11,13 +11,14 @@ export interface User {
   createdAt: string;
 }
 
-export function useUsers() {
+export function useUsers(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["users"],
     queryFn: async () => {
       const response = await fetchApi("/users");
       return response.data as User[];
     },
+    enabled: options?.enabled,
   });
 }
 

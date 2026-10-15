@@ -34,14 +34,19 @@ export function ClosingHistoryPage() {
   // Selected closing for detail modal
   const [selectedClosing, setSelectedClosing] = useState<DailyClosingItem | null>(null);
 
-  const { data, isLoading, isError, error, refetch } = useClosingHistory({
-    branchId: isOwner ? selectedBranchId || undefined : currentUser?.branchId,
-    status: (selectedStatus as DailyClosingStatus) || undefined,
-    startDate: startDate || undefined,
-    endDate: endDate || undefined,
-    page,
-    limit,
-  });
+  const isReady = Boolean(currentUser) && (isOwner ? true : Boolean(currentUser?.branchId));
+
+  const { data, isLoading, isError, error, refetch } = useClosingHistory(
+    {
+      branchId: isOwner ? selectedBranchId || undefined : currentUser?.branchId,
+      status: (selectedStatus as DailyClosingStatus) || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      page,
+      limit,
+    },
+    { enabled: isReady }
+  );
 
   const closings = data?.data || [];
   const pagination = data?.pagination;

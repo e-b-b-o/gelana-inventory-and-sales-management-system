@@ -154,10 +154,14 @@ export const getCurrentClosing = async (params: { branchId?: string; date?: stri
   return fetchApi(endpoint);
 };
 
-export const useCurrentClosing = (params: { branchId?: string; date?: string } = {}) => {
+export const useCurrentClosing = (
+  params: { branchId?: string; date?: string } = {},
+  options?: { enabled?: boolean }
+) => {
   return useQuery({
     queryKey: ["current-closing", params],
     queryFn: () => getCurrentClosing(params),
+    enabled: options?.enabled,
   });
 };
 
@@ -230,10 +234,14 @@ export const getClosingHistory = async (query: GetClosingHistoryQuery = {}): Pro
   return fetchApi(endpoint);
 };
 
-export const useClosingHistory = (query: GetClosingHistoryQuery = {}) => {
+export const useClosingHistory = (
+  query: GetClosingHistoryQuery = {},
+  options?: { enabled?: boolean }
+) => {
   return useQuery({
     queryKey: ["closings-history", query],
     queryFn: () => getClosingHistory(query),
+    enabled: options?.enabled,
   });
 };
 

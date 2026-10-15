@@ -13,7 +13,7 @@ export function SalesHistoryPage() {
   const isOwner = userResponse?.user?.role === "OWNER";
 
   const { data: branches = [] } = useBranches();
-  const { data: users = [] } = useUsers();
+  const { data: users = [] } = useUsers({ enabled: isOwner });
 
   const [branchId, setBranchId] = useState("");
   const [employeeId, setEmployeeId] = useState("");

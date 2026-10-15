@@ -34,11 +34,16 @@ export function CurrentClosingPage() {
   const selectedBranchId = searchParams.get("branchId") || (isOwner ? branches[0]?.id || "" : currentUser?.branchId || "");
   const selectedDate = searchParams.get("date") || getTodayString();
 
+  const isReady = Boolean(currentUser) && (isOwner ? (branches.length > 0 || Boolean(searchParams.get("branchId"))) : Boolean(currentUser?.branchId));
+
   // Query current closing
-  const { data: closingResponse, isLoading, isError, error, refetch } = useCurrentClosing({
-    branchId: selectedBranchId || undefined,
-    date: selectedDate,
-  });
+  const { data: closingResponse, isLoading, isError, error, refetch } = useCurrentClosing(
+    {
+      branchId: selectedBranchId || undefined,
+      date: selectedDate,
+    },
+    { enabled: isReady }
+  );
 
   const closingData = closingResponse?.data;
   const closing = closingData?.closing;
