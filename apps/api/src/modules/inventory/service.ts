@@ -5,6 +5,8 @@ import { AppError } from "../../utils/errors.js";
 import { GetBalancesQuery, GetMovementsQuery, RecordMovementParams, CreateOpeningStockInput, CreateAdjustmentInput, SubmitStocktakeInput, CreateDisposalInput } from "./schema.js";
 import { inventoryMovements } from "../../database/schema/inventoryMovements.js";
 import { sql } from "drizzle-orm";
+import { AuditService } from "../audit/service.js";
+import { NotificationService } from "../notifications/service.js";
 
 export class InventoryService {
   static async getBalances(query: GetBalancesQuery, user: any) {
@@ -256,6 +258,23 @@ export class InventoryService {
         createdById: params.createdById,
       }).returning();
 
+      // 8. Low-stock alert on reduction
+      if (quantity < 0 && newAvailable <= (balance.minimumStockQuantity > 0 ? balance.minimumStockQuantity : 5)) {
+        await NotificationService.notifyOwner(
+          {
+            title: "Low Stock Alert",
+            message: `Available stock dropped to ${newAvailable} units at branch.`,
+            type: "LOW_STOCK",
+            priority: newAvailable <= 0 ? "CRITICAL" : "IMPORTANT",
+            entityType: "product",
+            entityId: params.productId,
+            link: "/inventory",
+            metadata: { branchId: params.branchId, availableQuantity: newAvailable },
+          },
+          tx
+        );
+      }
+
       return movement;
     };
 
@@ -399,6 +418,25 @@ export class InventoryService {
         dbTx: tx,
       });
 
+      // Record system-wide audit
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.name || "Owner",
+          actorRole: user.role,
+          action: "OPENING_STOCK_RECORDED",
+          category: "INVENTORY",
+          entityType: "product",
+          entityId: input.productId,
+          branchId: input.branchId,
+          metadata: {
+            quantity: input.quantity,
+            unitCost: input.unitCost,
+          },
+        },
+        tx
+      );
+
       return movement;
     });
   }
@@ -424,6 +462,41 @@ export class InventoryService {
         createdById: user.id || user.userId,
         dbTx: tx,
       });
+
+      // Record system-wide audit
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.name || "Owner",
+          actorRole: user.role,
+          action: "STOCK_ADJUSTED",
+          category: "INVENTORY",
+          entityType: "product",
+          entityId: input.productId,
+          branchId: input.branchId,
+          reason: input.reason,
+          metadata: {
+            quantityDelta: input.quantityDelta,
+            reason: input.reason,
+          },
+        },
+        tx
+      );
+
+      // Notification
+      await NotificationService.notifyOwner(
+        {
+          title: "Stock Adjustment Recorded",
+          message: `Stock adjusted by ${input.quantityDelta > 0 ? "+" : ""}${input.quantityDelta}. Reason: ${input.reason}`,
+          type: "STOCK_ADJUSTMENT",
+          priority: "INFORMATIONAL",
+          entityType: "product",
+          entityId: input.productId,
+          link: "/inventory",
+          metadata: { branchId: input.branchId, quantityDelta: input.quantityDelta },
+        },
+        tx
+      );
 
       return movement;
     });
@@ -468,6 +541,25 @@ export class InventoryService {
           movements.push(movement);
         }
       }
+
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.role === "OWNER" ? "Owner" : "User",
+          actorRole: user.role,
+          action: "STOCKTAKE_SUBMITTED",
+          category: "INVENTORY",
+          entityType: "branch",
+          entityId: input.branchId,
+          branchId: input.branchId,
+          reason: input.reason,
+          metadata: {
+            itemCount: input.items.length,
+            adjustedCount: movements.length,
+          },
+        },
+        tx
+      );
       
       return movements;
     });
@@ -507,6 +599,25 @@ export class InventoryService {
         createdById: (user.id || user.userId) as string,
         dbTx: tx,
       });
+
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.role === "OWNER" ? "Owner" : "User",
+          actorRole: user.role,
+          action: "STOCK_DISPOSED",
+          category: "INVENTORY",
+          entityType: "product",
+          entityId: input.productId,
+          branchId: input.branchId,
+          reason: input.reason,
+          metadata: {
+            quantity: input.quantity,
+            reason: input.reason,
+          },
+        },
+        tx
+      );
 
       return movement;
     });

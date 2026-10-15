@@ -9,6 +9,8 @@ import { eq, and, or, sql, gte, lte, ilike } from "drizzle-orm";
 import { AppError } from "../../utils/errors.js";
 import { CreateReturnInput, GetReturnsQuery } from "./schema.js";
 import { InventoryService } from "../inventory/service.js";
+import { AuditService } from "../audit/service.js";
+import { NotificationService } from "../notifications/service.js";
 
 function round2(val: number): number {
   return Math.round((val + Number.EPSILON) * 100) / 100;
@@ -240,9 +242,45 @@ export class ReturnsService {
           referenceId: newReturn.id,
           reason: movementReason,
           createdById,
-          dbTx: tx,
         });
       }
+
+      // Record system-wide audit
+      await AuditService.recordAudit(
+        {
+          actorId: createdById,
+          actorName: user.name || "User",
+          actorRole: user.role,
+          action: "RETURN_PROCESSED",
+          category: "SALES_RETURNS",
+          entityType: "return",
+          entityId: newReturn.id,
+          branchId,
+          reason: input.reason,
+          metadata: {
+            returnNumber: newReturn.returnNumber,
+            refundAmount: newReturn.refundAmount,
+            itemCount: input.items.length,
+            isUnlinked,
+          },
+        },
+        tx
+      );
+
+      // Notify Owner of return
+      await NotificationService.notifyOwner(
+        {
+          title: "Sales Return Processed",
+          message: `Return ${newReturn.returnNumber} processed for $${newReturn.refundAmount}. Reason: ${input.reason}`,
+          type: "RETURN_RECEIVED",
+          priority: "IMPORTANT",
+          entityType: "return",
+          entityId: newReturn.id,
+          link: "/returns",
+          metadata: { returnNumber: newReturn.returnNumber, refundAmount: newReturn.refundAmount },
+        },
+        tx
+      );
 
       return newReturn;
 

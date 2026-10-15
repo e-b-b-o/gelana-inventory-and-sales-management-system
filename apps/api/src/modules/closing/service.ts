@@ -17,6 +17,8 @@ import {
   RejectClosingInput,
   GetClosingHistoryQuery,
 } from "./schema.js";
+import { AuditService } from "../audit/service.js";
+import { NotificationService } from "../notifications/service.js";
 
 function toCents(val: string | number): number {
   const num = typeof val === "string" ? parseFloat(val) : val;
@@ -521,6 +523,60 @@ export class ClosingService {
         revision,
       });
 
+      // Record system-wide audit
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.name || "User",
+          actorRole: user.role,
+          action: "CLOSING_SUBMITTED",
+          category: "CLOSINGS",
+          entityType: "daily_closing",
+          entityId: closingRecord.id,
+          branchId: targetBranchId,
+          reason: explanation || undefined,
+          metadata: {
+            date: input.date,
+            expectedCash: liveTotals.expectedCash,
+            actualCash: actualCashStr,
+            cashDifference: cashDifferenceStr,
+            revision,
+          },
+        },
+        tx
+      );
+
+      // Notify Owner
+      if (discrepancyCents !== 0) {
+        await NotificationService.notifyOwner(
+          {
+            title: "Daily Closing Discrepancy",
+            message: `Closing for ${input.date} submitted with a cash discrepancy of $${cashDifferenceStr}. Reason: ${explanation}`,
+            type: "CLOSING_DISCREPANCY",
+            priority: "CRITICAL",
+            entityType: "daily_closing",
+            entityId: closingRecord.id,
+            link: "/closing",
+            metadata: { date: input.date, branchId: targetBranchId, cashDifference: cashDifferenceStr },
+          },
+          tx
+        );
+      } else {
+        await NotificationService.notifyOwner(
+          {
+            title: "Daily Closing Submitted",
+            message: `Daily closing for ${input.date} submitted for review.`,
+            type: "CLOSING_SUBMITTED",
+            priority: "INFORMATIONAL",
+            entityType: "daily_closing",
+            entityId: closingRecord.id,
+            link: "/closing",
+            metadata: { date: input.date, branchId: targetBranchId },
+          },
+          tx
+        );
+      }
+
       return await tx.query.dailyClosings.findFirst({
         where: eq(dailyClosings.id, closingRecord.id),
         with: {
@@ -593,6 +649,41 @@ export class ClosingService {
         notes: reviewNotes || "Closing approved by Owner",
         revision: closing.revision,
       });
+
+      // Record system-wide audit
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.name || "Owner",
+          actorRole: "OWNER",
+          action: "CLOSING_APPROVED",
+          category: "CLOSINGS",
+          entityType: "daily_closing",
+          entityId: id,
+          branchId: closing.branchId,
+          reason: reviewNotes || undefined,
+          metadata: { date: closing.closingDate, notes: reviewNotes },
+        },
+        tx
+      );
+
+      // Notify submitter
+      if (closing.submittedById) {
+        await NotificationService.createNotification(
+          {
+            recipientUserId: closing.submittedById,
+            title: "Daily Closing Approved",
+            message: `Your daily closing for ${closing.closingDate} has been approved by the Owner.`,
+            type: "CLOSING_APPROVED",
+            priority: "INFORMATIONAL",
+            entityType: "daily_closing",
+            entityId: id,
+            link: "/closing",
+            metadata: { date: closing.closingDate },
+          },
+          tx
+        );
+      }
 
       return await tx.query.dailyClosings.findFirst({
         where: eq(dailyClosings.id, id),
@@ -673,6 +764,41 @@ export class ClosingService {
         notes: reason,
         revision: closing.revision,
       });
+
+      // Record system-wide audit
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.name || "Owner",
+          actorRole: "OWNER",
+          action: "CLOSING_REJECTED",
+          category: "CLOSINGS",
+          entityType: "daily_closing",
+          entityId: id,
+          branchId: closing.branchId,
+          reason,
+          metadata: { date: closing.closingDate, reason },
+        },
+        tx
+      );
+
+      // Notify submitter
+      if (closing.submittedById) {
+        await NotificationService.createNotification(
+          {
+            recipientUserId: closing.submittedById,
+            title: "Daily Closing Rejected",
+            message: `Your daily closing for ${closing.closingDate} was rejected: ${reason}`,
+            type: "CLOSING_REJECTED",
+            priority: "IMPORTANT",
+            entityType: "daily_closing",
+            entityId: id,
+            link: "/closing",
+            metadata: { date: closing.closingDate, reason },
+          },
+          tx
+        );
+      }
 
       return await tx.query.dailyClosings.findFirst({
         where: eq(dailyClosings.id, id),

@@ -10,6 +10,8 @@ import { AppError } from "../../utils/errors.js";
 import { CreateSaleInput, GetSalesQuery, GetSalesQuerySchema, VoidSaleInput, CorrectSaleInput } from "./schema.js";
 import { InventoryService } from "../inventory/service.js";
 import { productPrices } from "../../database/schema/productPrices.js";
+import { AuditService } from "../audit/service.js";
+import { NotificationService } from "../notifications/service.js";
 
 
 
@@ -257,6 +259,26 @@ export class SalesService {
         });
       }
 
+      // 8. Record audit log
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.name || "User",
+          actorRole: user.role,
+          action: "SALE_CREATED",
+          category: "SALES_RETURNS",
+          entityType: "sale",
+          entityId: sale!.id,
+          branchId: sale!.branchId,
+          metadata: {
+            saleNumber: sale!.saleNumber,
+            grandTotal: sale!.grandTotal,
+            itemCount: input.items.length,
+          },
+        },
+        tx
+      );
+
       return sale!;
     });
   }
@@ -482,6 +504,42 @@ export class SalesService {
 
       }
 
+      // Record system-wide audit
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.name || "Owner",
+          actorRole: user.role,
+          action: "SALE_VOIDED",
+          category: "SALES_RETURNS",
+          entityType: "sale",
+          entityId: sale.id,
+          branchId: sale.branchId,
+          reason: input.reason.trim(),
+          metadata: {
+            saleNumber: sale.saleNumber,
+            grandTotal: sale.grandTotal,
+            reason: input.reason.trim(),
+          },
+        },
+        tx
+      );
+
+      // Notify Owner
+      await NotificationService.notifyOwner(
+        {
+          title: "Sale Voided",
+          message: `Sale ${sale.saleNumber} was voided. Reason: ${input.reason.trim()}`,
+          type: "SALE_VOID",
+          priority: "CRITICAL",
+          entityType: "sale",
+          entityId: sale.id,
+          link: "/sales",
+          metadata: { saleNumber: sale.saleNumber, branchId: sale.branchId },
+        },
+        tx
+      );
+
       return {
         success: true,
         message: `Sale ${sale.saleNumber} has been successfully voided`,
@@ -519,6 +577,26 @@ export class SalesService {
         previousState: {},
         newState: { note: input.note || null },
       }).returning();
+
+      // Record system-wide audit
+      await AuditService.recordAudit(
+        {
+          actorId: user.id || user.userId,
+          actorName: user.name || "User",
+          actorRole: user.role,
+          action: "SALE_CORRECTED",
+          category: "SALES_RETURNS",
+          entityType: "sale",
+          entityId: sale.id,
+          branchId: sale.branchId,
+          reason: input.reason.trim(),
+          metadata: {
+            saleNumber: sale.saleNumber,
+            reason: input.reason.trim(),
+          },
+        },
+        tx
+      );
 
       return correction;
     });

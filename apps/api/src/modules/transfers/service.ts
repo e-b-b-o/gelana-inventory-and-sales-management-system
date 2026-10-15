@@ -26,6 +26,8 @@ import {
   ResolveDiscrepancyInput,
   ResolveDiscrepancySchema,
 } from "./schema.js";
+import { AuditService } from "../audit/service.js";
+import { NotificationService } from "../notifications/service.js";
 
 export class TransfersService {
   private static getActorId(user: any): string {
@@ -138,6 +140,48 @@ export class TransfersService {
         actorId,
         notes: input.notes ? `Requested: ${input.notes}` : "Transfer request submitted",
       });
+
+      // Record system-wide audit event
+      await AuditService.recordAudit(
+        {
+          actorId,
+          actorName: user.name || "User",
+          actorRole: user.role,
+          action: "TRANSFER_REQUESTED",
+          category: "TRANSFERS",
+          entityType: "transfer",
+          entityId: transfer.id,
+          branchId: sourceBranch.id,
+          branchName: sourceBranch.name,
+          reason: input.notes,
+          metadata: {
+            transferNumber: transfer.transferNumber,
+            sourceBranch: sourceBranch.name,
+            destinationBranch: destinationBranch.name,
+            itemCount: itemsToInsert.length,
+          },
+        },
+        tx
+      );
+
+      // Notify owner of new transfer request
+      await NotificationService.notifyOwner(
+        {
+          title: "New Transfer Request",
+          message: `Transfer ${transfer.transferNumber} requested from ${sourceBranch.name} to ${destinationBranch.name}`,
+          type: "TRANSFER_REQUESTED",
+          priority: "IMPORTANT",
+          entityType: "transfer",
+          entityId: transfer.id,
+          link: `/transfers/${transfer.id}`,
+          metadata: {
+            transferNumber: transfer.transferNumber,
+            sourceBranch: sourceBranch.name,
+            destinationBranch: destinationBranch.name,
+          },
+        },
+        tx
+      );
 
       return {
         ...transfer,
@@ -430,6 +474,44 @@ export class TransfersService {
         notes: input.notes ? `Approved: ${input.notes}` : "Transfer request approved by Owner",
       });
 
+      await AuditService.recordAudit(
+        {
+          actorId,
+          actorName: user.name || "Owner",
+          actorRole: user.role,
+          action: "TRANSFER_APPROVED",
+          category: "TRANSFERS",
+          entityType: "transfer",
+          entityId: transfer.id,
+          branchId: transfer.sourceBranchId,
+          reason: input.notes,
+          metadata: {
+            transferNumber: updatedTransfer.transferNumber,
+          },
+        },
+        tx
+      );
+
+      // Notify requester
+      if (transfer.createdById) {
+        await NotificationService.createNotification(
+          {
+            recipientUserId: transfer.createdById,
+            title: "Transfer Request Approved",
+            message: `Transfer ${updatedTransfer.transferNumber} has been approved by Owner`,
+            type: "TRANSFER_APPROVED",
+            priority: "IMPORTANT",
+            entityType: "transfer",
+            entityId: transfer.id,
+            link: `/transfers/${transfer.id}`,
+            metadata: {
+              transferNumber: updatedTransfer.transferNumber,
+            },
+          },
+          tx
+        );
+      }
+
       return updatedTransfer;
     });
   }
@@ -485,6 +567,45 @@ export class TransfersService {
         actorId,
         notes: `Rejected: ${input.reason}`,
       });
+
+      await AuditService.recordAudit(
+        {
+          actorId,
+          actorName: user.name || "Owner",
+          actorRole: user.role,
+          action: "TRANSFER_REJECTED",
+          category: "TRANSFERS",
+          entityType: "transfer",
+          entityId: transfer.id,
+          branchId: transfer.sourceBranchId,
+          reason: input.reason,
+          metadata: {
+            transferNumber: updatedTransfer.transferNumber,
+          },
+        },
+        tx
+      );
+
+      // Notify requester
+      if (transfer.createdById) {
+        await NotificationService.createNotification(
+          {
+            recipientUserId: transfer.createdById,
+            title: "Transfer Request Rejected",
+            message: `Transfer ${updatedTransfer.transferNumber} was rejected: ${input.reason}`,
+            type: "TRANSFER_REJECTED",
+            priority: "IMPORTANT",
+            entityType: "transfer",
+            entityId: transfer.id,
+            link: `/transfers/${transfer.id}`,
+            metadata: {
+              transferNumber: updatedTransfer.transferNumber,
+              reason: input.reason,
+            },
+          },
+          tx
+        );
+      }
 
       return updatedTransfer;
     });
@@ -617,6 +738,43 @@ export class TransfersService {
         actorId,
         notes: input.notes ? `Dispatched: ${input.notes}` : "Stock dispatched from source branch",
       });
+
+      await AuditService.recordAudit(
+        {
+          actorId,
+          actorName: user.name || "User",
+          actorRole: user.role,
+          action: "TRANSFER_DISPATCHED",
+          category: "TRANSFERS",
+          entityType: "transfer",
+          entityId: transfer.id,
+          branchId: transfer.sourceBranchId,
+          reason: input.notes,
+          metadata: {
+            transferNumber: updatedTransfer.transferNumber,
+            destinationBranchId: transfer.destinationBranchId,
+          },
+        },
+        tx
+      );
+
+      // Notify destination branch staff
+      await NotificationService.notifyBranchEmployees(
+        transfer.destinationBranchId,
+        {
+          title: "Transfer Dispatched",
+          message: `Transfer ${updatedTransfer.transferNumber} has been dispatched to your branch`,
+          type: "TRANSFER_DISPATCHED",
+          priority: "IMPORTANT",
+          entityType: "transfer",
+          entityId: transfer.id,
+          link: `/transfers/${transfer.id}`,
+          metadata: {
+            transferNumber: updatedTransfer.transferNumber,
+          },
+        },
+        tx
+      );
 
       return updatedTransfer;
     });
@@ -802,6 +960,63 @@ export class TransfersService {
           ? `Discrepancy recorded during receiving: ${discrepancyDetails.join("; ")}`
           : (input.notes ? `Received in full: ${input.notes}` : "Stock received in full at destination branch"),
       });
+
+      await AuditService.recordAudit(
+        {
+          actorId,
+          actorName: user.name || "User",
+          actorRole: user.role,
+          action: hasDiscrepancy ? "TRANSFER_DISCREPANCY" : "TRANSFER_RECEIVED",
+          category: "TRANSFERS",
+          entityType: "transfer",
+          entityId: transfer.id,
+          branchId: transfer.destinationBranchId,
+          reason: input.notes,
+          metadata: {
+            transferNumber: updatedTransfer.transferNumber,
+            hasDiscrepancy,
+            discrepancyDetails: hasDiscrepancy ? discrepancyDetails : undefined,
+          },
+        },
+        tx
+      );
+
+      // If discrepancy exists, notify Owner as critical
+      if (hasDiscrepancy) {
+        await NotificationService.notifyOwner(
+          {
+            title: "Transfer Discrepancy Alert",
+            message: `Transfer ${updatedTransfer.transferNumber} received with discrepancies: ${discrepancyDetails.join("; ")}`,
+            type: "TRANSFER_DISCREPANCY",
+            priority: "CRITICAL",
+            entityType: "transfer",
+            entityId: transfer.id,
+            link: `/transfers/${transfer.id}`,
+            metadata: {
+              transferNumber: updatedTransfer.transferNumber,
+            },
+          },
+          tx
+        );
+      }
+
+      // Notify source branch staff that transfer was received
+      await NotificationService.notifyBranchEmployees(
+        transfer.sourceBranchId,
+        {
+          title: "Transfer Received",
+          message: `Transfer ${updatedTransfer.transferNumber} has been received at the destination branch`,
+          type: "TRANSFER_RECEIVED",
+          priority: "INFORMATIONAL",
+          entityType: "transfer",
+          entityId: transfer.id,
+          link: `/transfers/${transfer.id}`,
+          metadata: {
+            transferNumber: updatedTransfer.transferNumber,
+          },
+        },
+        tx
+      );
 
       return updatedTransfer;
     });
