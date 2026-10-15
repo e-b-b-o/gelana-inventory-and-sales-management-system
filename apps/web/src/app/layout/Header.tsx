@@ -1,6 +1,7 @@
 import { useLocation, Link } from "react-router-dom";
 import { useQueryClient, QueryClient } from "@tanstack/react-query";
 import type { Product } from "../../features/products/api";
+import { useUnreadCountQuery } from "../../features/notifications/api";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KNOWN_STATIC_SEGMENTS = new Set([
@@ -106,17 +107,23 @@ function getBreadcrumbLabel(path: string, index: number, paths: string[], queryC
   if (path === "movements") return "Movements";
   if (path === "stocktake") return "Stocktake";
   if (path === "daily-closing") return "Daily Closing";
+  if (path === "notifications") return "Notifications";
+  if (path === "audit-logs") return "Audit Log";
+  if (path === "settings") return "Settings";
 
   return path.charAt(0).toUpperCase() + path.slice(1).replace(/-/g, " ");
 }
 
 interface HeaderProps {
   user: { name?: string; role?: string };
+  onOpenMobile?: () => void;
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, onOpenMobile }: HeaderProps) {
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { data: unreadData } = useUnreadCountQuery();
+  const unreadCount = (unreadData as any)?.unreadCount ?? (unreadData as any)?.data?.unreadCount ?? 0;
 
   // Robust breadcrumb generation supporting dynamic detail routes and query cache lookup
   const generateBreadcrumbs = () => {
@@ -158,6 +165,17 @@ export function Header({ user }: HeaderProps) {
     <header className="sticky top-0 z-20 h-14 bg-surface-container-lowest border-b border-outline-variant px-margin flex items-center justify-between shrink-0">
       {/* Breadcrumb Hierarchy */}
       <div className="flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant">
+        {onOpenMobile && (
+          <button
+            type="button"
+            onClick={onOpenMobile}
+            className="md:hidden p-1.5 -ml-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors cursor-pointer"
+            title="Open navigation"
+            aria-label="Open navigation"
+          >
+            <span className="material-symbols-outlined text-[20px]">menu</span>
+          </button>
+        )}
         {generateBreadcrumbs()}
       </div>
 
@@ -170,12 +188,21 @@ export function Header({ user }: HeaderProps) {
           <span className="text-[10px] text-on-surface-variant font-normal">({user?.role === 'OWNER' ? 'Owner view' : 'Employee view'})</span>
         </div>
 
-        {/* Notification Bell Icon Button */}
+        {/* Notification Bell Link */}
         <div className="pl-2 border-l border-outline-variant">
-          <button className="relative p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors" title="Notifications">
-            <span className="material-symbols-outlined">notifications</span>
-            <span className="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
-          </button>
+          <Link
+            to="/notifications"
+            className="relative p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors flex items-center justify-center cursor-pointer"
+            title="Notifications"
+            aria-label="Notifications"
+          >
+            <span className="material-symbols-outlined text-[20px]">notifications</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-primary text-on-primary text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </Link>
         </div>
       </div>
     </header>

@@ -27,5 +27,14 @@
     background-image: radial-gradient(rgba(0, 71, 255, 0.06) 1.25px, transparent 1.25px);
     background-size: 24px 24px;
   }
+
+  /* Hide scrollbar while preserving smooth scrolling */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 

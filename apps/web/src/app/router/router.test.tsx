@@ -152,5 +152,66 @@ describe("AppShell and Routing behavior", () => {
         expect(screen.queryByText("Page not found")).toBeTruthy();
       });
     });
+
+    it("resolves /notifications to NotificationsPage without rendering 404 fallback", async () => {
+      const { routes } = await import("./index");
+      const memoryRouter = createMemoryRouter(routes, {
+        initialEntries: ["/notifications"],
+      });
+
+      render(
+        <QueryClientProvider client={createTestClient()}>
+          <RouterProvider router={memoryRouter} />
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByRole("heading", { name: "Notifications" })).toBeTruthy();
+      });
+
+      expect(screen.queryByText("Page not found")).toBeNull();
+      expect(screen.queryByText("We couldn't find the page you're looking for.")).toBeNull();
+    });
+
+    it("resolves /settings to SettingsPage without rendering 404 fallback", async () => {
+      const { routes } = await import("./index");
+      const memoryRouter = createMemoryRouter(routes, {
+        initialEntries: ["/settings"],
+      });
+
+      render(
+        <QueryClientProvider client={createTestClient()}>
+          <RouterProvider router={memoryRouter} />
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByRole("heading", { name: "Settings" })).toBeTruthy();
+      });
+
+      expect(screen.queryByText("Page not found")).toBeNull();
+      expect(screen.queryByText("We couldn't find the page you're looking for.")).toBeNull();
+    });
+
+    it("verifies sidebar and top-bar notifications navigation links point to /notifications", async () => {
+      const { routes } = await import("./index");
+      const memoryRouter = createMemoryRouter(routes, {
+        initialEntries: ["/"],
+      });
+
+      render(
+        <QueryClientProvider client={createTestClient()}>
+          <RouterProvider router={memoryRouter} />
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        const notifLinks = screen.getAllByRole("link", { name: /Notifications/i });
+        expect(notifLinks.length).toBeGreaterThanOrEqual(1);
+        notifLinks.forEach((link) => {
+          expect(link.getAttribute("href")).toBe("/notifications");
+        });
+      });
+    });
   });
 });

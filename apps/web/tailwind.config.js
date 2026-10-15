@@ -65,6 +65,9 @@ export default {
         'card': '0 24px 48px -12px rgba(15, 23, 42, 0.08), 0 4px 16px -2px rgba(0, 71, 255, 0.04)',
         'btn': '0 10px 24px -6px rgba(0, 71, 255, 0.38)',
         'sm': '0 1px 3px rgba(30, 36, 48, 0.04), 0 1px 2px rgba(30, 36, 48, 0.02)',
+        'bento': '0 1px 3px rgba(22, 28, 39, 0.03), 0 4px 14px -2px rgba(22, 28, 39, 0.04)',
+        'bento-hover': '0 8px 24px -4px rgba(22, 28, 39, 0.08)',
+        'pill': '0 2px 8px -2px rgba(22, 28, 39, 0.25)',
       },
       spacing: {
         "space-lg": "1.5rem",

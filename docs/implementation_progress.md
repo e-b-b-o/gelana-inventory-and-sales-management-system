@@ -1034,7 +1034,429 @@ Milestone 5 (Receiving) - Slice 5.1 (Receiving).
   - Monorepo production build: `npm run build` passed with **0 errors** across both API and Web.
 - **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
 
+## Milestone 10 — Dashboards & Reporting (Slices 10.1–10.6)
 
+- **Status**: Implemented, Automated Checks Passed, Pending User Manual Verification
+- **Completed Slices**:
+  - **Slice 10.1 — Owner Dashboard**:
+    - Backend module: `apps/api/src/modules/dashboard` (`schema.ts`, `service.ts`, `controller.ts`, `routes.ts`, `dashboard.test.ts`).
+    - Authoritative backend KPI aggregations (`GET /api/v1/dashboard/owner`):
+      - Dynamic date filtering: `preset` (`today`, `yesterday`, `this_week`, `this_month`, `last_month`, `custom`) and optional `branchId`.
+      - Comparative metrics: Current period vs Previous period comparison with percentage changes for Total Sales, Net Revenue, and Order Counts.
+      - Inventory health & valuation: Total stock count, Low Stock count, Out of Stock count, and total inventory valuation at WAC ($\sum(\text{availableQuantity} \times \text{wac})$).
+      - Action Required operational alerts:
+        - Unresolved Daily Closing Discrepancies count (`hasDiscrepancy: true` or `variance != 0`).
+        - Pending Transfer Approvals count (`status = REQUESTED`).
+      - Branch Performance Comparison: Multi-branch breakdown of Sales Amount, Transaction Counts, and Low Stock counts with percentage of total business revenue contribution.
+      - Sales Performance Trend: Intervals (daily/hourly) with sales amounts and transaction counts.
+      - Recent Business Activities: Real-time stream of audit events from daily closings, stock transfers, and sales with actor attribution and formatted relative timestamps.
+    - Frontend UI implementation (`OwnerDashboard.tsx`):
+      - Strictly follows Stitch UI Design Reference Section 5.4.
+      - Header bar with dynamic branch selector dropdown (`All Branches` or specific branch) and time period filter.
+      - Quick operational Action Required alerts card with direct navigation links to Daily Closing and Transfers.
+      - 4 Primary KPI cards: Total Sales / Net Revenue (with growth badge), Total Transactions, Low / Out of Stock alerts, and Total Inventory Valuation.
+      - Responsive Sales Trend chart and Multi-Branch Performance breakdown table with visual revenue progress bars.
+      - Low Stock alert item table and Recent Activity log.
+  - **Slice 10.2 — Employee Dashboard**:
+    - Backend module: `apps/api/src/modules/dashboard` (`GET /api/v1/dashboard/employee`).
+    - Strict role authorization & branch isolation:
+      - Branch is derived strictly from `req.user.branchId` on the server; client-provided branch IDs are forbidden.
+      - Sensitive financial fields (unit costs, WAC, total inventory valuation, gross profit, business-wide revenue) are completely excluded from both API response and UI.
+    - Operational Metrics:
+      - Today's Branch Sales total and Transaction count.
+      - Employee's Own Sales total and Transaction count for the shift.
+      - Register Status & Daily Closing action state:
+        - Closing status (`DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`).
+        - Next required action guidance (e.g. "Submit Daily Closing before shift end" or Owner rejection feedback alert).
+      - Inbound Dispatched Transfers: Pending transfers dispatched to this branch requiring receipt and reconciliation.
+      - Branch Low Stock warnings: Products at or below reorder point at the assigned branch.
+      - Recent Sales at branch with cashier attribution, payment method, and amount.
+    - Frontend UI implementation (`EmployeeDashboard.tsx`):
+      - Branch-scoped operational overview with clear assigned branch indicator.
+      - Action Required banner for Daily Closing (with quick link to submit closing or review rejection reason).
+      - KPI cards for Today's Branch Sales, My Sales Today, Low Stock Items, and Inbound Transfers.
+      - Quick action buttons to routine operational workflows (New POS Sale, Daily Closing, Inbound Transfers).
+      - Inbound Transfers card with receipt action, Branch Stock Alerts table, and Recent Sales table.
+  - **Slice 10.3 — Sales Reports**:
+    - Backend module: `apps/api/src/modules/reports` (`schema.ts`, `service.ts`, `controller.ts`, `routes.ts`, `reports.test.ts`).
+    - Authoritative aggregations (`GET /api/v1/reports/sales`):
+      - Date-range filtering supporting standard presets (`today`, `yesterday`, `this_week`, `this_month`, `last_month`, `custom`) with strict ISO boundaries.
+      - Owner-only multi-branch filtering; Employee strictly restricted to session branch.
+      - Sales totals: Gross Sales, Item Discounts, Order Discounts, Total Discounts, Returns / Refunds deductions, Net Sales / Net Revenue, Total Completed Sales Count, Average Order Value.
+      - Payment-method breakdown: Net collected amount per method ($\text{receivedAmount} - \text{refundedAmount}$) across Cash, Credit Card, Bank Transfer, and Telebirr.
+      - Grouping dimensions: Group by `day`, `branch`, `employee`, `product`, or `payment_method`.
+      - Sales trend over time: Continuous daily data points with peak day highlighting.
+      - Detailed transaction records with server-side pagination (`page`, `limit`), cashier attribution, payment breakdown, and direct navigation links to sale details.
+      - Correct treatment of edge cases: Voided sales (`VOIDED`) excluded from revenue and counts; returns and refunds properly deducted.
+    - Frontend UI implementation (`SalesReportsTab.tsx`):
+      - Follows Stitch UI Reference Section 5.10.
+      - Filter bar with date range presets, custom date inputs, branch selector (Owner only), and group-by dropdown.
+      - 4 Summary KPI cards: Net Revenue, Gross Sales, Total Discounts, and Completed Transactions.
+      - Visual sales trend chart with peak day badge.
+      - Payment Methods Breakdown grid with percentage contributions.
+      - Aggregated Breakdown Table with dynamic headers according to selected grouping dimension.
+      - Detailed Sales Transactions Table with pagination, status badges, payment methods, and detail view actions.
+      - CSV export functionality (`handleExportCSV`) generating downloadable report spreadsheets based on filtered data.
+  - **Slice 10.4 — Inventory Reports**:
+    - Backend module: `apps/api/src/modules/reports` (`GET /api/v1/reports/inventory`).
+    - Reporting views:
+      - `balances`: Current available, damaged, and in-transit stock across Product + Branch; branch-specific reorder point thresholds; computed stock status (`IN_STOCK`, `LOW_STOCK`, `OUT_OF_STOCK`).
+      - `movements`: Historical immutable inventory ledger movements (`OPENING_STOCK`, `RECEIVING`, `SALE`, `RETURN_GOOD`, `RETURN_DAMAGED`, `TRANSFER_IN`, `TRANSFER_OUT`, `ADJUSTMENT`) with transaction reference, user attribution, and movement reason.
+      - `transfers`: Stock transfer reconciliation tracking requested, dispatched, received, damaged, and missing quantities, plus stock in transit and discrepancy flags.
+    - Strict financial privacy:
+      - Owner receives full WAC, unit costs, and inventory valuation ($\text{availableQuantity} \times \text{wac}$).
+      - Employees receive `null` for WAC, unit cost, and valuation across all endpoints and response payloads.
+    - Frontend UI implementation (`InventoryReportsTab.tsx`):
+      - View toggle for Stock Balances, Movements Ledger, and Transfers Reconciliation.
+      - Dynamic KPI cards tailored to active view (Stock units, Damaged count, In-Transit total, Low Stock & Out of Stock alerts, and Owner Valuation).
+      - Stock status and movement type filters, date picker, branch filter (Owner only), and CSV export.
+  - **Slice 10.5 — Profit Reports (Owner Only)**:
+    - Backend module: `apps/api/src/modules/reports` (`GET /api/v1/reports/profit`).
+    - Role authorization & security:
+      - Endpoint protected by `authorizeRole(["OWNER"])` and service-level permission verification. Non-owners receive 403 Forbidden.
+      - Profit Reports tab is completely concealed from Employees in the web UI.
+    - Financial & inventory cost calculations:
+      - Net Revenue = Gross Sales minus Sales Returns.
+      - Gross COGS = sum of historical WAC snapshots captured on sale item records ($\text{quantity} \times \text{unitCostSnapshots}$).
+      - Return COGS Adjustment = cost basis credited for sellable returned goods.
+      - Net COGS = Gross COGS minus Return COGS Adjustment.
+      - Gross Profit = Net Revenue minus Net COGS.
+      - Profit Margin % = $(\text{Gross Profit} / \text{Net Revenue}) \times 100$.
+      - Voided sales excluded; refunds properly accounted for.
+    - Performance breakdown dimensions: Aggregations by `day`, `branch`, `category`, and `product`.
+    - Trend analysis: Daily revenue, COGS, and profit line chart with peak day badge.
+    - Detailed transaction records audit: Item-level breakdown of sale price, WAC cost basis snapshot, profit, and margin.
+    - Frontend UI implementation (`ProfitReportsTab.tsx`):
+      - 4 KPI summary cards (Net Revenue, Net COGS, Gross Profit, Profit Margin %).
+      - Responsive SVG Trend Chart with revenue, cost, and profit paths.
+      - Breakdown table and Detailed WAC Cost Basis table with server-side pagination and CSV export.
+  - **Slice 10.6 — Closing Reports**:
+    - Backend module: `apps/api/src/modules/reports` (`GET /api/v1/reports/closing`).
+    - Authoritative reconciliation:
+      - Summarizes total closings, approved closings, pending review closings, rejected closings, and unsubmitted registers.
+      - Compares backend-calculated expected cash with cashier-declared actual cash.
+      - Quantifies cash discrepancy variance and surfaces recorded staff discrepancy explanations.
+      - Aggregates payment method reconciliation totals (gross collected, refunded, net collected, transaction counts).
+      - Audit trail tracking review decisions, reviewer identity, review timestamps, review notes, rejection reasons, and revisions.
+    - Branch scoping: Owner can view all or filter by branch; Employee is strictly scoped to assigned branch.
+    - Frontend UI implementation (`ClosingReportsTab.tsx`):
+      - 4 KPI cards (Total Closings with status distribution, Expected Cash, Actual Cash, Cash Variance).
+      - Payment Method Reconciliation summary table.
+      - Daily Closing Records table with status badges, variance color coding, submitter/reviewer attribution, and CSV export.
+      - Detailed Audit Modal displaying tender allocations and complete historical event timeline.
+  - **Overall Reports Hub Integration (`ReportsPage.tsx`)**:
+    - Segmented control linking all 4 report slices (Sales, Inventory, Profit, Closing).
+    - Profit tab button dynamically rendered only for Owner.
+    - Defensive fallback redirects employee to Sales tab if profit view is requested.
+    - Single shared breadcrumb rule preserved: AppShell provides navigation breadcrumbs; ReportsPage contains no internal duplicate breadcrumb.
+- **Database Schema Changes & Migrations**:
+  - No new database migrations required; report calculations query existing indexes and relational models across `sales`, `sale_items`, `sales_returns`, `inventory_balances`, `inventory_movements`, `stock_transfers`, `daily_closings`, `daily_closing_payments`, and `daily_closing_events`.
+- **Architectural & Security Compliance**:
+  - Strict server-side branch isolation: authenticated user's `branchId` is derived from session, preventing unauthorized cross-branch data access.
+  - Zero sensitive financial leakage: Cost of Goods Sold, WAC, and Gross Profit fields are completely omitted from employee endpoints and UI components. Profit reports are strictly 403 Forbidden for non-owners.
+  - Zero mock data or fabricated metrics: All values calculated via PostgreSQL queries directly on persisted transactions, payments, returns, closings, and inventory movements.
+  - Single breadcrumb compliance: AppShell owns breadcrumb navigation; individual report views render no duplicate breadcrumbs.
+  - Consistent layout spacing: Root containers use `space-y-6` with standard layout padding and typography matching Stitch design specifications.
+- **Automated Verification Performed**:
+  - Monorepo test suite: **36 test files, 249 / 249 tests passing**.
+    - Backend dashboard integration tests: `apps/api/src/modules/dashboard/dashboard.test.ts` (**8 / 8 tests passed**).
+    - Backend reports integration tests: `apps/api/src/modules/reports/reports.test.ts` (**12 / 12 tests passed**).
+    - Frontend dashboard UI tests: `apps/web/src/features/dashboard/DashboardPage.test.tsx` (**4 / 4 tests passed**).
+    - Frontend reports UI tests: `apps/web/src/features/reports/ReportsPage.test.tsx` (**3 / 3 tests passed**).
+  - Monorepo typecheck: `npm run typecheck` passed with **0 errors** across both API and Web.
+  - Monorepo linting: `npm run lint` passed with **0 errors**.
+  - Monorepo production build: `npm run build` passed with **0 errors** across both API and Web.
+- **Browser Testing**: Intentionally skipped; reserved for manual verification by the user.
 
+## UI Design Refinement — Modern Bento SaaS Styling & Collapsible Sidebar
+
+**Status**: Completed
+
+### Tasks Completed
+- **Design Tokens & Tailwind Utilities**:
+  - Extended `apps/web/tailwind.config.js` with modern SaaS shadow tokens:
+    - `shadow-bento`: `0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.03)` for soft depth.
+    - `shadow-bento-hover`: `0 8px 24px rgba(0, 0, 0, 0.08)` for subtle elevation on interactive elements.
+    - `shadow-pill`: `0 2px 8px rgba(0, 0, 0, 0.18)` for the active dark pill navigation state.
+- **Collapsible Desktop & Mobile Sidebar (`Sidebar.tsx`, `AppShell.tsx`, `Header.tsx`)**:
+  - Implemented desktop collapsible sidebar rail:
+    - Default state is **expanded** (`w-64`).
+    - Collapses smoothly into a compact icon rail (`w-[72px]`) with centered navigation icons and hover tooltips displaying route names.
+    - Collapse/expand toggle button with panel collapse icon located in the sidebar header, plus keyboard shortcut `Ctrl+B`.
+    - User collapse state persisted in `localStorage` under `gelana_sidebar_collapsed` (defaults to expanded if not set).
+  - Dark pill-style active navigation state:
+    - Current active route rendered with `bg-[#161C27] text-white shadow-pill font-semibold rounded-xl`, removing generic horizontal accent bars and left borders.
+    - High-contrast text, clear icon alignment, and distinct default/hover/active/focus states.
+  - Responsive mobile drawer:
+    - Mobile sliding drawer (`z-50`) with backdrop overlay (`bg-black/40 backdrop-blur-xs`) and header hamburger toggle button.
+- **Modular Bento Dashboard Cards (`OwnerDashboard.tsx`, `EmployeeDashboard.tsx`)**:
+  - Upgraded cards to consistent `rounded-2xl border border-outline-variant/60 shadow-bento bg-surface`.
+  - Removed decorative colored accent lines and left borders (`border-l-4`), replacing them with refined typography hierarchy, soft metric badges, and subtle icon containers (`p-3 bg-primary/10 rounded-xl`).
+  - Balanced grid gutters (`gap-5`, `gap-6`) and generous internal padding (`p-6`).
+- **Refined Chart Hover & Interaction States (`OwnerDashboard.tsx`, `SalesReportsTab.tsx`, `ProfitReportsTab.tsx`)**:
+  - **Owner Dashboard Sales Bar Chart**:
+    - Interactive bar hover with subtle vertical dashed guideline (`border-l border-dashed border-primary/40`).
+    - Gelana primary gradient highlight on hover (`bg-gradient-to-t from-primary to-primary-hover shadow-md`).
+    - Smooth rounded tops (`rounded-t-md`).
+    - Floating compact tooltip showing real formatted sales currency and transaction count.
+  - **Sales Reports SVG Trend Line**:
+    - Added interactive `hoveredPointIndex` tracking with dashed vertical guideline (`stroke="#0047FF" strokeDasharray="3 3"`).
+    - Focused active data point marker (`r="6" fill="#0047FF" stroke="#FFFFFF" strokeWidth="3"`).
+    - Floating dark pill tooltip (`bg-[#161C27] text-white rounded-xl shadow-pill`) displaying real date, revenue, and transaction count.
+  - **Profit Reports SVG Multi-Line Chart**:
+    - Interactive `hoveredTrendIndex` with synchronized vertical guideline.
+    - High-contrast focused markers for Revenue (`#0047FF`), COGS (`#EF4444`), and Gross Profit (`#10B981`).
+    - Floating dark pill tooltip displaying exact Net Profit, Profit Margin %, Revenue, and COGS for that day.
+- **Reports Hub & Modals Bento Styling (`ReportsPage.tsx`, `SalesReportsTab.tsx`, `InventoryReportsTab.tsx`, `ProfitReportsTab.tsx`, `ClosingReportsTab.tsx`)**:
+  - Segmented control tabs upgraded to Bento container (`rounded-2xl border border-outline-variant/60 p-2 shadow-bento`) with rounded pill tabs (`rounded-xl`).
+  - Removed generic bottom accent lines (`<div className="absolute bottom-0 left-0 right-0 h-1 bg-primary"></div>`) across report tabs.
+  - Daily Closing audit detail modal upgraded to `rounded-2xl shadow-2xl border border-outline-variant/40`.
+- **Preserved System Constraints**:
+  - Kept Gelana's blue primary identity (`#0047FF`) and existing theme tokens.
+  - Zero business logic, API contract, or database modifications.
+  - Preserved single breadcrumb structure in `AppShell` with zero duplicated breadcrumbs.
+
+### Verification Performed
+### Sidebar UI Regression Repair & Color Palette Restoration
+- **Restored Gelana's Brand Palette**:
+  - Removed the near-black charcoal active navigation treatment (`bg-[#161C27] text-white shadow-pill`).
+  - Restored Gelana's brand primary blue active treatment: `bg-primary/10 text-primary font-semibold rounded-xl` with filled primary icon (`style={{ fontVariationSettings: "'FILL' 1" }}`).
+  - Inactive states cleanly use `text-on-surface-variant font-medium hover:bg-surface-container/70 hover:text-on-surface rounded-xl`.
+- **Eliminated Scrollbar & Overflow Regressions**:
+  - Added `.no-scrollbar` utility in `apps/web/src/index.css` (`scrollbar-width: none`, `-ms-overflow-style: none`, `::-webkit-scrollbar: display none`) to eliminate thick OS scrollbars and directional arrows.
+  - Added `overflow-x-hidden` on navigation and layout wrappers to prevent horizontal scrolling and pagination-like scrollbar arrows.
+  - Sized collapsed buttons symmetrically (`w-10 h-10 mx-auto`) inside available inner width, completely resolving the right-edge clipping of active navigation pills.
+- **Unifying Icons, Flyout Menus & Tooltips**:
+  - Unified all icons to standard Material Symbols (`material-symbols-outlined text-[20px] shrink-0`) centered along the vertical axis (`x = 36px` in collapsed rail).
+  - Implemented floating flyout submenus for navigation groups (`Sales`, `Inventory`, `Daily Closing`) when collapsed, allowing direct submenu navigation on hover/focus without inline chevrons.
+  - Implemented floating dark tooltips for standalone items in collapsed rail mode.
+  - Maintained distinct separation between navigation items, header collapse toggle, and profile/logout footer.
+- **Verification**:
+  - Monorepo test suite: **36 test files, 251 / 251 tests passing** (`npm test`).
+  - Monorepo typecheck: `npm run typecheck` passed with **0 errors**.
+  - Monorepo linting: `npm run lint` passed with **0 errors**.
+  - Monorepo production build: `npm run build` passed with **0 errors**.
+
+## Milestone 11 — Notifications, Audit Log & Settings
+
+**Status**: Completed
+
+### Tasks Completed
+- **Database Schema & Migration**:
+  - Created migration `0020_clammy_the_initiative.sql` adding 4 new tables:
+    - `notifications`: User-scoped notification inbox with `title`, `message`, `type`, `priority` (INFORMATIONAL/WARNING/CRITICAL), `isRead`, entity references, and deep links.
+    - `notification_preferences`: Per-user category-level opt-in/opt-out toggles (CRITICAL priority notifications bypass preferences).
+    - `audit_logs`: Immutable append-only audit ledger with `actor_id`, `actor_name`, `actor_role`, `action`, `category`, `entity_type`, `entity_id`, `branch_id`, `branch_name`, `reason`, and `metadata` (JSONB).
+    - `account_requests`: Employee account-change request workflow table with `type`, `status` (PENDING/APPROVED/REJECTED), `payload`, `reason`, `decision_notes`, reviewer tracking, and timestamps.
+  - Proper foreign key constraints, cascade deletes, and performance indexes on all tables.
+- **Notifications System (Backend)**:
+  - `NotificationService` with `createNotification` (preference-aware, CRITICAL bypass), `getNotifications` (paginated, filtered), `getUnreadCount`, `markAsRead`, `markAllAsRead`.
+  - Category-based preference matching maps notification `type` prefixes to logical categories (`TRANSFERS`, `CLOSINGS`, `SALES_RETURNS`, `INVENTORY`, `ACCOUNT`).
+  - Controller and routes: `GET /api/v1/notifications`, `GET /unread-count`, `PUT /:id/read`, `PUT /read-all`.
+  - Integrated into core business operations: sales voids/corrections, returns processing, stock transfers, daily closing, and account request workflows.
+- **Audit Log System (Backend)**:
+  - `AuditService` with `recordAudit` (append-only with recursive sensitive data sanitization), `getAuditLogs` (filtered/paginated/searchable), `getAuditLogById`.
+  - Sensitive keys (`password`, `token`, `secret`, etc.) automatically stripped from metadata before persistence.
+  - Role-based access: Owner sees all logs, Employee sees only own-branch logs.
+  - Integrated into sales voids/corrections, returns, settings changes, and account request decisions.
+- **Settings System (Backend)**:
+  - `SettingsService` with:
+    - `updateProfile`: Display name changes with audit logging.
+    - `changePassword`: Owner-only direct password change (validates current password, hashes with Argon2).
+    - `createAccountRequest`: Employee account-change request submission (password changes, name changes) without exposing proposed passwords in audit/notification payloads.
+    - `getMyRequests`: Employee view of own request history.
+    - `getPendingRequests`: Owner view of all pending account requests.
+    - `decideRequest`: Owner approval/rejection workflow executing authorized database updates on approval.
+    - `getNotificationPreferences` / `updateNotificationPreferences`: Category-level opt-in/opt-out toggles.
+  - Controller and routes: `GET/PUT /api/v1/settings/profile`, `PUT /password`, `GET/POST /requests`, `GET /requests/pending`, `PUT /requests/:id/decide`, `GET/PUT /notification-preferences`.
+- **Notifications Page (Frontend)**:
+  - `NotificationsPage.tsx`: Full notification center with unread count, mark-as-read/mark-all, priority badges (WARNING, CRITICAL), entity deep links, and empty state.
+  - `useUnreadCountQuery` hook polled by Sidebar/Header for real-time unread badge display.
+- **Audit Log Page (Frontend)**:
+  - `AuditLogPage.tsx`: Professional audit log viewer with search, date-range picker, category/branch filters, and detail inspection modal showing full metadata.
+  - Owner-only navigation link in Sidebar.
+- **Settings Page (Frontend)**:
+  - `SettingsPage.tsx`: Comprehensive settings area with tabbed sections:
+    - **My Profile**: Display name editing with branch/role display.
+    - **Account & Security**: Owner direct password change; Employee account-change request submission.
+    - **My Requests**: Employee request tracking with status badges.
+    - **Owner Request Management**: Approval/rejection workflow with decision notes.
+    - **Notification Preferences**: Category-level toggle controls.
+- **Navigation & Layout Integration**:
+  - Updated `Sidebar.tsx` with dynamic unread notification badge, Audit Log link (owner-only), and Settings link.
+  - Updated `Header.tsx` with notification bell icon and unread count.
+- **Security & Authorization**:
+  - Role-based access strictly enforced on backend (OWNER vs EMPLOYEE).
+  - Branch scoping enforced for employee audit and notification queries.
+  - Sensitive data (passwords, tokens, password hashes) sanitized and excluded from audit payloads and notifications.
+
+### Quality-check results
+- **API Tests**: 49 test files, **383 / 383 tests passed**.
+  - Includes `audit.test.ts`, `notifications.test.ts`, and `settings.test.ts`.
+- **Web Tests**: 13 test files, **66 / 66 tests passed**.
+  - Sidebar tests updated to include `QueryClientProvider` wrapper for `useUnreadCountQuery` compatibility.
+- **Typecheck**: Both API and Web workspaces typecheck successfully with **0 errors**.
+- **Lint**: `npm run lint` passed with **0 errors**.
+- **Build**: `npm run build` succeeded for all workspaces.
+
+### Files Created
+- `apps/api/src/database/schema/notifications.ts`
+- `apps/api/src/database/schema/notificationPreferences.ts`
+- `apps/api/src/database/schema/auditLogs.ts`
+- `apps/api/src/database/schema/accountRequests.ts`
+- `apps/api/src/database/migrations/0020_clammy_the_initiative.sql`
+- `apps/api/src/modules/notifications/` (service, controller, routes, schema, tests)
+- `apps/api/src/modules/audit/` (service, controller, routes, schema, tests)
+- `apps/api/src/modules/settings/` (service, controller, routes, schema, tests)
+- `apps/web/src/features/notifications/` (api, NotificationsPage)
+- `apps/web/src/features/audit/` (api, AuditLogPage)
+- `apps/web/src/features/settings/` (api, SettingsPage)
+
+### Files Modified
+- `apps/api/src/app.ts` (registered notification, audit, and settings routers)
+- `apps/api/src/database/schema/index.ts` (exported new table schemas)
+- `apps/api/src/modules/sales/service.ts` (integrated audit + notification triggers)
+- `apps/api/src/modules/returns/service.ts` (integrated audit + notification triggers)
+- `apps/web/src/app/router/index.tsx` (added `/notifications`, `/audit-logs`, `/settings` routes)
+- `apps/web/src/app/layout/Sidebar.tsx` (unread badge, audit link, settings link)
+- `apps/web/src/app/layout/Header.tsx` (notification bell icon)
+- `apps/web/src/app/layout/Sidebar.test.tsx` (QueryClientProvider wrapper fix)
+
+### Browser Testing
+- Intentionally skipped; reserved for manual verification by the user.
+
+### Targeted Fix — Settings Profile Flow, Save Errors, and Notifications Navigation (Corrective Task)
+
+**Status**: Completed
+
+#### Problems Addressed & Root Causes
+1. **Problem A — Settings Opened Directly into Editable Form**:
+   - *Previous behavior*: Navigating to `/settings` immediately presented editable input fields with a "Save Profile" button, which felt like an edit form rather than an overview.
+   - *Resolution*: Redesigned the Profile tab into a view-first architecture. It opens into a sleek, read-only profile overview presenting the user's avatar with initials, full display name, email, role badge, assigned branch, account status badge ("Active & In Good Standing"), and "Member Since" date. Clicking the explicit "Edit Profile" button enters inline edit mode. Clicking "Cancel" restores the saved state without mutating.
+2. **Problem B — Profile Save Errors & Missing Data**:
+   - *Root causes*:
+     1. Backend `settingsRouter` only registered `PUT /profile`, whereas the frontend client issued a `PATCH` request, causing `404 Cannot PATCH /api/v1/settings/profile`.
+     2. The backend lacked a dedicated `GET /api/v1/settings/profile` endpoint, causing frontend profile queries to return 404 and leaving edit forms blank or uninitialized.
+   - *Resolution*: Implemented `SettingsService.getProfile(userId)` with full user info and joined branch names. Added `GET /profile` and registered `PATCH /profile` alongside `PUT /profile` in `settingsRouter`.
+3. **Problem C — Notifications Navigation Showed "Page Not Found"**:
+   - *Root cause*: `NotificationController.getNotifications` returned `{ data: { notifications: [...], total, ... } }`. `NotificationsPage.tsx` attempted `const notifications = data?.data || []`, which evaluated to an object rather than an array. Calling `notifications.map(...)` threw an uncaught runtime `TypeError: notifications.map is not a function`. React Router's route-level `<ProtectedRoute errorElement={<NotFoundPage />} />` caught the error and rendered the 404 fallback page.
+   - *Resolution*: Standardized backend notification controller to return `{ data: result.notifications, pagination: ... }`. Enriched frontend with defensive checks (`Array.isArray(data?.data) ? data.data : data?.data?.notifications || []`). Fixed similar response handling in `AuditLogPage.tsx` and unread count parsing in `Header.tsx`.
+
+#### Tasks Completed
+- **Backend (`apps/api`)**:
+  - `SettingsService.getProfile`: Fetches authenticated user's profile with branch details and status.
+  - `SettingsController.getProfile`: Exposes profile retrieval.
+  - `settingsRouter`: Registered `GET /profile`, `PATCH /profile`, and compatibility aliases for `/password`, `/notification-preferences`, and `/account-requests/:id/decision`.
+  - `NotificationController.getNotifications`: Standardized response structure to return data array with sibling pagination.
+  - `AuditController.getAuditLogs`: Standardized payload structure.
+  - `settings.test.ts`: Added unit tests covering `getProfile` for Owner and Employee roles.
+- **Frontend (`apps/web`)**:
+  - `SettingsPage.tsx`: Built view-first Profile tab with clean toggling between read-only card and edit form, locked protected attributes (email, role, branch) with explanatory helper notes, full validation (2–255 characters), cancel handling, and mutation state banners.
+  - `SettingsPage.test.tsx`: Added 6 unit tests validating read-only profile rendering, entering edit mode, cancel discarding changes, successful profile save, validation errors, and server failure handling.
+  - `router.test.tsx`: Added routing tests ensuring `/notifications` and `/settings` render their corresponding feature pages rather than 404 fallback.
+  - Defensive array parsing in `NotificationsPage.tsx` and `AuditLogPage.tsx`.
+
+#### Quality-check Results
+- **Tests**: Monorepo Vitest passed with **40 / 40 test files passed (274 / 274 tests passed)**.
+- **Typecheck**: Both API and Web passed with **0 errors**.
+- **Lint**: Oxlint passed with **0 errors**.
+- **Build**: Monorepo production build (`npm run build`) succeeded with **0 errors**.
+
+### Targeted Fix — API Request Storm, Daily Closing History Failure, and React Duplicate Keys (Corrective Task)
+
+**Status**: Completed
+
+#### Problems Addressed & Confirmed Root Causes
+
+1. **React Duplicate-Key Warnings for IDs `...0301` through `...0306`**:
+   - *Confirmed Root Cause*: IDs `00000000-0000-4000-8000-000000000301` through `0306` are the 6 seeded catalog products. In PostgreSQL, `product_prices` lacked a unique constraint on active prices (`effective_until IS NULL`), which allowed duplicate active price rows per unit. When `ProductsService.getProducts()` executed a SQL join on `product_prices` where `effectiveUntil IS NULL`, each product joined against 2 active price records, returning every product twice (12 rows instead of 6) to the client. This triggered repeated React duplicate-key warnings in components rendering products (`Catalog.tsx`, `NewTransferPage.tsx`, etc.).
+   - *Resolution*:
+     - Cleaned up duplicate active rows in `product_prices` table in PostgreSQL.
+     - Refactored `ProductsService.getProducts()` to use Drizzle relational `db.query.products.findMany` with `limit: 1` on active price ordered by `effectiveFrom DESC, id DESC`, guaranteeing at most one active price per product unit regardless of DB state.
+     - Added regression test in `products.test.ts` verifying that `getProducts` returns exactly 1 item per product even when multiple price records exist.
+
+2. **`403 Forbidden` on `/api/v1/users`**:
+   - *Confirmed Root Cause*: In `SalesHistoryPage.tsx`, the hook `useUsers()` was invoked unconditionally on component mount. However, `/api/v1/users` is an OWNER-only endpoint protected by `authorizeRole(["OWNER"])`. While the UI already conditionally hid the employee selector for non-owners (`{isOwner && (...)}`), the data query hook executed unconditionally for all roles.
+   - *Resolution*: Updated `useUsers` in `apps/web/src/features/users/api/index.ts` to accept `{ enabled?: boolean }` options, and updated `SalesHistoryPage.tsx` to pass `{ enabled: isOwner }`. Employees now never query `/users`.
+   - Added unit tests in `SalesHistoryPage.test.tsx` verifying no user queries are dispatched when logged in as employee.
+
+3. **`429 Too Many Requests` & API Request Storm**:
+   - *Confirmed Root Causes*:
+     1. Backend `generalLimiter` in `apps/api/src/app.ts` was set to an overly restrictive 200 requests per 15-minute window per IP.
+     2. In `apps/web/src/app/providers/index.tsx`, TanStack Query was initialized with default `staleTime: 0` and automatic retries on failed requests. Normal page transitions refetched `["me"]`, `["branches"]`, and feature data repeatedly.
+     3. Global unread notifications were polled every 30 seconds by two simultaneously mounted components (`Header.tsx` and `Sidebar.tsx`).
+     4. `CurrentClosingPage` and `ClosingHistoryPage` dispatched queries with `branchId: undefined` before `currentUser` had resolved, immediately followed by a second query once user data loaded.
+     5. Any 401, 403, or 429 response triggered TanStack Query's default exponential retry loop, escalating traffic until the rate limit was exhausted.
+   - *Resolution*:
+     - Tuned `generalLimiter` from 200 to 1000 requests per 15-minute window, with standardized JSON error response `{ error: { code: "RATE_LIMIT_EXCEEDED", message: "..." } }`.
+     - Standardized `fetchApi` with a custom `ApiError` class that parses status code, message, error details, and extracts the `Retry-After` header.
+     - Configured `QueryClient` default options with `staleTime: 60 * 1000` (1 minute), custom `shouldRetry` (returns `false` for 401, 403, 404; max 1 retry for 429; max 2 for 5xx), and `calculateRetryDelay` (respects `Retry-After` bounded between 1s–30s, falls back to exponential backoff capped at 10s).
+     - Gated `CurrentClosingPage` and `ClosingHistoryPage` queries with `enabled: isReady` so queries only execute once user and branch context are fully resolved.
+     - Updated notification polling in `api.ts` to halt when encountering 401 or 403 errors.
+
+4. **Daily Closing "Failed to load closing history" (`/api/v1/closings/history` & `/current`)**:
+   - *Confirmed Root Cause*: When the API request storm hit the 200-request limit, `/api/v1/closings/history` responded with `429 Too Many Requests`. In `fetchApi`, string response bodies were spread into numeric properties (`0: "T", 1: "o"...`), leaving `error.message` undefined. The query hook failed, leading `ClosingHistoryPage` to render "Failed to load closing history: An unexpected error occurred".
+   - *Resolution*: Resolved the root causes of the request storm and rate limit exhaustion, and fixed `fetchApi` error parsing with `ApiError`. Closing history and current closing endpoints now load cleanly without repeated calls or rate limiting.
+
+5. **`401 Unauthorized` on `/api/v1/auth/me`**:
+   - *Confirmed Root Cause*: When an unauthenticated visitor visited the app or a session expired, TanStack Query retried the failed `/auth/me` call multiple times in combination with staleTime 0 refetches, triggering 429 rate limit errors and polling errors.
+   - *Resolution*: Bounded retries prevent any retry on 401. Session/cookie authentication operates cleanly with zero retry storms on unauthenticated states.
+
+#### Tasks Completed
+- **Backend (`apps/api`)**:
+  - `apps/api/src/modules/products/service.ts`: Switched `getProducts` to Drizzle relational query with single active price limit.
+  - `apps/api/src/modules/products/products.test.ts`: Added test verifying single active price per unit.
+  - `apps/api/src/app.ts`: Increased rate limit to 1000 req/15min with standard JSON response.
+  - `apps/api/src/modules/users/service.ts`: Ensured `getUserForSession` returns name and email.
+  - `apps/api/src/middleware/authenticate.ts`: Attached name and email to `req.user`.
+  - `apps/api/src/modules/reports/reports.test.ts`: Scoped profit report test to avoid test collision.
+- **Frontend (`apps/web`)**:
+  - `apps/web/src/lib/api.ts`: Implemented `ApiError` class, parsed `Retry-After`, fixed error message parsing.
+  - `apps/web/src/lib/api.test.ts`: Added 12 unit tests verifying error handling, HTTP statuses, headers, and retry logic.
+  - `apps/web/src/app/providers/index.tsx`: Configured bounded retries, `Retry-After` backoff, and 60s staleTime.
+  - `apps/web/src/features/users/api/index.ts`: Added `options?: { enabled?: boolean }` to `useUsers`.
+  - `apps/web/src/features/sales/SalesHistoryPage.tsx`: Gated `useUsers` with `isOwner`.
+  - `apps/web/src/features/sales/SalesHistoryPage.test.tsx`: Added unit tests verifying role-based gating of user queries.
+  - `apps/web/src/features/closing/api/index.ts`: Added `enabled` support to closing hooks.
+  - `apps/web/src/features/closing/CurrentClosingPage.tsx`: Deferred query until `currentUser` and `branches` are ready.
+  - `apps/web/src/features/closing/ClosingHistoryPage.tsx`: Deferred query until `currentUser` is ready.
+  - `apps/web/src/features/notifications/api.ts`: Halted unread count polling on 401/403.
+
+#### Quality-check Results
+- **Tests**: Monorepo Vitest passed with **42 / 42 test files passed (289 / 289 tests passed)**.
+- **Typecheck**: Both API and Web passed with **0 errors**.
+- **Lint**: Oxlint passed with **0 errors**.
+- **Build**: Monorepo production build (`npm run build`) succeeded with **0 errors**.
+
+### Targeted Fix — Collapsed Sidebar Multi-Page Group Navigation (Flyout Submenus)
+
+**Status**: Completed
+
+#### Problems Addressed & Confirmed Root Causes
+- *Issue*: When the sidebar was collapsed into an icon rail, multi-page parent items (e.g. Sales, Daily Closing, and Inventory for Owner) could not be clicked to reliably open sub-navigation. The prior implementation used a CSS hover-only opacity toggle (`group-hover:opacity-100`) with no `onClick` handler, causing menus to vanish prematurely or fail completely on touch devices and keyboard navigation. Additionally, overflow hidden on `<aside>` and `<nav>` combined with CSS `transform` containing blocks risked clipping the flyout at sidebar and viewport boundaries.
+- *Resolution*:
+  - Refactored `Sidebar.tsx` multi-page groups (`NavAccordion`) to support click-to-open flyout submenus when collapsed, while preserving inline accordion behavior when expanded.
+  - Rendered the flyout submenu via `createPortal(..., document.body)` with `position: fixed`, completely eliminating overflow clipping from `<aside>` and `<nav>` and bypassing containing block traps.
+  - Dynamically calculated and clamped vertical position (`top`) between `12px` and `window.innerHeight - flyoutHeight - 12px`, ensuring zero viewport clipping near the top or bottom edges of the screen.
+  - Positioned the flyout beside the collapsed rail (`left: rect.right + 8px`) with compact max-width (`260px`) to prevent unnecessary covering of page content.
+  - Maintained visual active state on both the parent trigger button (`bg-primary/10 text-primary`) and active child route when a child is selected.
+  - Added click outside and Escape key listeners with focus restoration to the parent button.
+  - Implemented keyboard accessibility (`ArrowDown`, `ArrowUp`, `Home`, `End`, `Tab`, `Escape`) and ARIA menu roles (`role="menu"`, `role="menuitem"`, `aria-haspopup="menu"`, `aria-expanded`).
+  - Extracted helper subcomponents (`NavItem`, `NavAccordion`, `NavGroup`) to top-level definitions to preserve DOM identity and eliminate render unmount churn.
+  - Updated and expanded `Sidebar.test.tsx` (10 tests) covering click toggling, child selection navigation, outside click, Escape key dismiss, keyboard navigation, and single-page navigation.
+
+#### Files Changed
+- `apps/web/src/app/layout/Sidebar.tsx`
+- `apps/web/src/app/layout/Sidebar.test.tsx`
+- `docs/implementation_progress.md`
+
+#### Quality-check Results
+- **Tests**: Monorepo Vitest passed with **42 / 42 test files passed (294 / 294 tests passed)**.
+- **Typecheck**: Both API and Web passed with **0 errors**.
+- **Lint**: Oxlint passed with **0 errors**.
+- **Build**: Monorepo production build (`npm run build`) succeeded with **0 errors**.
+
+### Next Recommended Milestone
+Milestone 12 — Production Readiness & Optimization.
 
 

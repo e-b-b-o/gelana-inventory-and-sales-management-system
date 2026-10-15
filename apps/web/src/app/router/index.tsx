@@ -26,6 +26,11 @@ import { NewTransferPage } from "../../features/transfers/NewTransferPage";
 import { TransferDetailsPage } from "../../features/transfers/TransferDetailsPage";
 import { CurrentClosingPage } from "../../features/closing/CurrentClosingPage";
 import { ClosingHistoryPage } from "../../features/closing/ClosingHistoryPage";
+import { DashboardPage } from "../../features/dashboard/DashboardPage";
+import { ReportsPage } from "../../features/reports/components/ReportsPage";
+import { NotificationsPage } from "../../features/notifications/NotificationsPage";
+import { AuditLogPage } from "../../features/audit/AuditLogPage";
+import { SettingsPage } from "../../features/settings/SettingsPage";
 
 
 function ProtectedRoute() {
@@ -80,7 +85,15 @@ export const routes = [
         children: [
           {
             index: true,
-            element: <div><h1>Dashboard</h1><p>Welcome to Gelana Phase 1 Shell</p></div>
+            element: <DashboardPage />
+          },
+          {
+            path: "reports",
+            element: <ReportsPage />
+          },
+          {
+            path: "reports/sales",
+            element: <ReportsPage />
           },
           {
             path: "users",
@@ -166,6 +179,18 @@ export const routes = [
           {
             path: "daily-closing/history",
             element: <ClosingHistoryPage />
+          },
+          {
+            path: "notifications",
+            element: <NotificationsPage />
+          },
+          {
+            path: "audit-logs",
+            element: <AuditLogPage />
+          },
+          {
+            path: "settings",
+            element: <SettingsPage />
           }
         ]
 
