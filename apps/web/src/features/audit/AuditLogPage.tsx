@@ -152,12 +152,13 @@ export function AuditLogPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
           {/* Keyword Search */}
           <div className="lg:col-span-2 relative">
-            <label className="block text-body-xs font-semibold text-on-surface-variant mb-1">Search</label>
+            <label htmlFor="audit-search-input" className="block text-body-xs font-semibold text-on-surface-variant mb-1">Search</label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
                 search
               </span>
               <input
+                id="audit-search-input"
                 type="text"
                 placeholder="Search action, actor, reason, entity..."
                 value={search}
@@ -172,8 +173,9 @@ export function AuditLogPage() {
 
           {/* Category Filter */}
           <div>
-            <label className="block text-body-xs font-semibold text-on-surface-variant mb-1">Category</label>
+            <label htmlFor="audit-category-select" className="block text-body-xs font-semibold text-on-surface-variant mb-1">Category</label>
             <select
+              id="audit-category-select"
               value={category}
               onChange={(e) => {
                 setCategory(e.target.value);
@@ -194,8 +196,9 @@ export function AuditLogPage() {
           {/* Branch Filter (Owner View) */}
           {isOwner && (
             <div>
-              <label className="block text-body-xs font-semibold text-on-surface-variant mb-1">Branch</label>
+              <label htmlFor="audit-branch-select" className="block text-body-xs font-semibold text-on-surface-variant mb-1">Branch</label>
               <select
+                id="audit-branch-select"
                 value={branchId}
                 onChange={(e) => {
                   setBranchId(e.target.value);
@@ -215,8 +218,9 @@ export function AuditLogPage() {
 
           {/* Date Range Start */}
           <div>
-            <label className="block text-body-xs font-semibold text-on-surface-variant mb-1">From Date</label>
+            <label htmlFor="audit-from-date" className="block text-body-xs font-semibold text-on-surface-variant mb-1">From Date</label>
             <input
+              id="audit-from-date"
               type="date"
               value={startDate}
               onChange={(e) => {
@@ -229,10 +233,11 @@ export function AuditLogPage() {
         </div>
 
         {/* Date End & Reset Controls */}
-        <div className="flex items-center justify-between pt-2 border-t border-outline-variant/50">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-outline-variant/50">
           <div className="flex items-center gap-3">
-            <span className="text-body-xs text-on-surface-variant font-medium">To Date:</span>
+            <label htmlFor="audit-to-date" className="text-body-xs text-on-surface-variant font-medium">To Date:</label>
             <input
+              id="audit-to-date"
               type="date"
               value={endDate}
               onChange={(e) => {

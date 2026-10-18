@@ -1456,7 +1456,232 @@ Milestone 5 (Receiving) - Slice 5.1 (Receiving).
 - **Lint**: Oxlint passed with **0 errors**.
 - **Build**: Monorepo production build (`npm run build`) succeeded with **0 errors**.
 
-### Next Recommended Milestone
-Milestone 12 — Production Readiness & Optimization.
+---
 
+## Milestone 11 — Notifications & Audit (Verification & Stabilization)
 
+**Status**: Verified Complete
+
+### Verification Results
+1. **Notifications (Slice 11.1)**:
+   - **Navigation Entry Points**: Verified both sidebar navigation item (`to="/notifications"`) and header notification bell (`to="/notifications"`). Both resolve to `NotificationsPage` with 0 errors, no 404 fallbacks, and real-time unread badges.
+   - **Business Event Triggers**: Verified that genuine events trigger notifications (transfers requested/dispatched/resolved, daily closings submitted/approved/rejected, sales voids, inventory adjustments, and account change request submissions/decisions).
+   - **Permissions & Scoping**: Notifications are securely scoped to `recipientUserId`. Employees only receive branch-relevant notifications, while Owners receive system-wide operational alerts.
+   - **Idempotency**: `NotificationService.createNotification` enforces idempotency for the same entity and type, preventing rapid duplicate alerts.
+   - **User Preferences**: Users can toggle category notifications (`TRANSFERS`, `CLOSINGS`, `SALES_RETURNS`, `INVENTORY`, `ACCOUNT`). CRITICAL priority alerts strictly bypass preferences and are always delivered.
+   - **Mark as Read**: Both individual mark-as-read (`PATCH /api/v1/notifications/:id/read`) and bulk mark-all-as-read (`POST /api/v1/notifications/mark-all-read`) operate correctly and maintain unread count consistency.
+   - **Page States**: Loading skeleton, empty state, error with retry button, and pagination operate cleanly.
+2. **Audit Log (Slice 11.2)**:
+   - **Immutability**: Audit records are strictly append-only. There are no `PUT`, `PATCH`, or `DELETE` endpoints on the audit router.
+   - **Sanitization**: `AuditService.sanitizeMetadata` recursively strips sensitive keys (`password`, `passwordHash`, `token`, `secret`, `cookie`, `authorization`) before persistence.
+   - **Role Scoping**: Owners have access to all logs across branches and categories. Employees are strictly isolated to their assigned branch and cannot access `AUTH`, `USERS`, or `SETTINGS` category audit records.
+   - **UI & Modal**: `AuditLogPage` provides category filtering, branch filtering (Owner only), keyword search across actions/actors/reasons/branches, date-range filtering, and an inspection modal showing sanitized JSON metadata. Added accessible `id` and `htmlFor` attributes to all filter inputs.
+3. **Settings & Account Management (Slice 11.3)**:
+   - **View-First Profile Architecture**: `/settings` opens to a clean, read-only profile overview displaying name, email, role badge, branch assignment, and account standing. Users must explicitly click "Edit Profile" to enter edit mode; clicking "Cancel" discards unsaved edits without mutating state.
+   - **Protected Field Security**: Email, role, and branch are locked in the edit form with explanatory helper notes. Permitted display name updates are validated (2–255 characters), audited via `PROFILE_UPDATED`, and persisted to PostgreSQL.
+   - **Account Change Requests**: Employees submit change requests for protected fields (e.g. Email Change, Password Reset) without accepting or storing proposed passwords. Duplicate pending requests are blocked. Owners review pending requests and approve/reject with decision notes, triggering automatic user updates and notifying employees.
+   - **Password Security**: Direct password changes require current password verification and Argon2id hashing.
+
+### Code and Test Additions
+- Created `apps/web/src/features/notifications/NotificationsPage.test.tsx` (7 tests covering list rendering, priority badges, unread filtering, individual mark as read, bulk mark as read, empty state, and error/retry state).
+- Created `apps/web/src/features/audit/AuditLogPage.test.tsx` (5 tests covering table rendering, actor/action labels, category filter, keyword search, inspect modal with sanitized metadata, and filter reset).
+- Updated `apps/web/src/app/router/router.test.tsx` to add test verifying `/audit-logs` route resolution without 404 fallback.
+- Added accessible `id` and `htmlFor` attributes to `AuditLogPage.tsx` search, category, branch, and date range inputs.
+
+---
+
+## Milestone 12 — Offline Mode
+
+**Status**: **Skipped — Out of Scope by Project Decision (Cleanup Completed)**
+
+### Architectural Decision & Codebase Cleanup
+- Gelana is built as an **online-only application** by deliberate architectural decision (recorded in `docs/project_decisions.md` under **AD-01**).
+- Stationery store operations have reliable branch connectivity. Implementing client-side SQLite/IndexedDB transaction caches, sync queues, conflict resolution engines, and background synchronization would dramatically escalate maintenance complexity, increase the security attack surface, and risk data divergence.
+- All transactional workflows (Sales, Receivings, Returns, Transfers, Adjustments, Closings) execute online against the central PostgreSQL database inside atomic ACID transactions.
+- Milestone 12 is intentionally skipped and will not be implemented. It does not block Milestone 13 (Full Verification, completed) or Milestone 14 (Production Hardening).
+
+### Completed Offline Functionality Removal & Alignment:
+1. **Removed `isOfflineSync` Negative Stock Bypass**:
+   - Removed `isOfflineSync` parameter from `RecordMovementParams` in `apps/api/src/modules/inventory/schema.ts`.
+   - Removed `isOfflineSync` conditional bypass in `InventoryService.recordMovement` (`apps/api/src/modules/inventory/service.ts`), ensuring the non-negative inventory constraint (`available < 0`, `damaged < 0`, `inTransit < 0`) is strictly and unconditionally enforced for all operations.
+   - Replaced obsolete offline bypass test in `apps/api/src/modules/inventory/inventoryMovements.test.ts` with a test verifying that negative inventory is strictly blocked with no bypasses.
+2. **Removed Obsolete `requiredSyncCompleted` Daily Closing Check**:
+   - Removed `requiredSyncCompleted` from `checks` in `DailyClosingService.getCurrentClosing` (`apps/api/src/modules/closing/service.ts`).
+   - Removed `requiredSyncCompleted` UI card and icon from `apps/web/src/features/closing/CurrentClosingPage.tsx`.
+   - Updated `CurrentClosingResponse['checks']` interface in `apps/web/src/features/closing/api/index.ts`.
+   - Updated test assertions and mocks in `apps/api/src/modules/closing/closing.test.ts` and `apps/web/src/features/closing/ClosingPage.test.tsx`.
+3. **Removed Unfinished Placeholder Directories**:
+   - Safely removed empty directory `apps/web/src/offline/`.
+   - Safely removed empty directory `apps/api/src/modules/sync/`.
+4. **Documentation & Architecture Alignment**:
+   - Updated `AGENTS.md` to explicitly forbid offline/PWA sync queue implementations.
+   - Updated `docs/technical_design.md` (principles, primary key generation, daily closing, transaction IDs, and Section 27) to state the online-only architecture.
+   - Updated `docs/implementation_rules.md` (Rule 16) to "Online-Only Architecture (Milestone 12 Skipped)".
+   - Updated `docs/project_decisions.md` (Question 35 and Sections 28/29) with formal annotations explaining they were superseded by Architectural Decision AD-01.
+
+---
+
+## Milestone 13 — Full Verification
+
+**Status**: Completed
+
+### Comprehensive Verification Summary by Domain
+
+1. **Authentication & Authorization**:
+   - HTTP-only JWT cookie sessions (`/api/v1/auth/login`, `/me`, `/logout`).
+   - Role-based authorization (`OWNER` vs `EMPLOYEE`) enforced at the backend middleware layer (`authorizeRole`).
+   - Branch isolation enforced from authenticated session context (`req.user.branchId`), never trusting client payloads.
+   - Sensitive financial metrics (cost prices, WAC snapshots, gross profit calculations, valuation) strictly excluded from employee API responses and UI views.
+2. **Master Data & Inventory**:
+   - Product catalog, stationery categories, base units, alternate units with conversion factors, versioned selling prices.
+   - Branch-aware inventory balances (`available_quantity`, `damaged_quantity`, `in_transit_quantity`).
+   - Authoritative recalculation of Weighted Average Cost (WAC) on Receiving (`RECEIVING`) and Opening Stock (`OPENING_STOCK`).
+   - Strict immutability of the `inventory_movements` ledger; every stock modification records movement type, quantity delta, prior/new balance, and timestamp.
+   - Adjustments require mandatory reasons. Negative inventory is strictly prevented for all normal operations.
+3. **Sales & Returns**:
+   - Atomic checkout transaction (`db.transaction()`): creates sale, item snapshots (preserving price and WAC at time of sale), payment records, inventory deduction, and ledger movements.
+   - Payment validation: payment sum must equal grand total.
+   - Owner-only discounts (line-item and sale-level proportional allocations with remainder to largest line). Employees attempting discounts are rejected with 403.
+   - Returns management: Sellable returned items route to available stock (`RETURN_GOOD`); damaged returned items route to damaged stock (`RETURN_DAMAGED`). Cash refunds reduce expected cash for the return date.
+   - Owner-only void and amendment workflows with mandatory reasons and audit history. Sales with returns cannot be voided.
+4. **Stock Transfers**:
+   - Complete 5-stage lifecycle: `REQUESTED` → `APPROVED` / `REJECTED` → `DISPATCHED` → `RECEIVED` → `COMPLETED`.
+   - Dispatched stock decrements source branch available quantity and increments source in-transit quantity with `TRANSFER_OUT` ledger entries.
+   - Received stock decrements in-transit and increments destination available quantity with `TRANSFER_IN` ledger entries and WAC recalculation.
+   - Discrepancy handling: damaged or missing goods require mandatory explanation, generate `DAMAGE` or `SHORTAGE` ledger entries, and require Owner resolution.
+   - Invalid state transitions (e.g. double dispatch, receiving unapproved transfers) are strictly blocked.
+5. **Daily Closing**:
+   - Current closing calculates expected cash authoritatively from cash sales minus cash refunds for the closing date across payment methods.
+   - Submission requires confirmation that all sales are recorded (`allSalesRecorded: true`).
+   - Cash discrepancies require a mandatory explanation.
+   - Owner approval locks the closing against future edits or duplicate submissions. Owner rejection allows employee correction and resubmission.
+   - Closing history is strictly scoped to the employee's branch.
+6. **Dashboards & Reports (Milestone 10)**:
+   - Owner Dashboard: multi-branch or single-branch view, sales KPIs, inventory valuation, low-stock/out-of-stock counts, pending transfer and closing discrepancy action cards.
+   - Employee Dashboard: strictly branch-scoped, sales summary, stock alerts (with cost/WAC fields excluded), inbound dispatched transfers.
+   - Reports: Sales, Inventory, Profit (Owner-only), and Closing reports with date ranges and branch filters. Backend `authorizeRole(["OWNER"])` prevents employees from accessing profit reports or leaking cost data.
+7. **Cross-Module Integration**:
+   - Verified data consistency across receiving, sales, returns, transfers, closing, notifications, and audit logging.
+   - Audit logging and notifications fire reliably across all business workflows.
+8. **Automated Quality Checks Executed**:
+   - **Monorepo Vitest Suite**: **44 test files, 307 / 307 tests passed** (`npm test`).
+     - Includes new `NotificationsPage.test.tsx` (7 tests) and `AuditLogPage.test.tsx` (5 tests).
+   - **TypeScript Strict Typecheck**: `npm run typecheck` passed with **0 errors** across both `@gelana-inventory-and-sales-management-system/api` and `@gelana-inventory-and-sales-management-system/web`.
+   - **Linter**: `npm run lint` passed with **0 errors** across all workspaces.
+   - **Production Build**: `npm run build` passed with **0 errors**, generating clean production bundles.
+9. **Test Accounts & Branches Validation**:
+   - Validated standard test accounts (`owner@gelana.com`, `downtown@gelana.com`, `employee@gelana.com`, `warehouse@gelana.com`, all with password `password123`).
+   - Validated standard 3 branches (`BRANCH-MAIN`, `BRANCH-DT`, `BRANCH-WH`). Existing data preserved without destructive operations.
+
+---
+
+## Next Milestone
+
+---
+
+## Performance Phase 1 — Measure, Diagnose, and Fix Existing Bottlenecks
+
+**Status**: Completed
+
+### 1. Objective & Scope
+- **Focus**: Eliminating repeated API requests, unnecessary retries, redundant data fetching, avoidably expensive calculations, and measuring baseline vs. post-optimization performance.
+- **Strict Boundary**: Phase 1 only. Responsive layout redesigns deferred to Phase 2; deep database indexing and query restructuring deferred to Phase 3; security audit deferred to Phase 4. Strictly preserved online-only architecture and existing test data.
+
+### 2. Baseline Measurements & Before/After Comparison
+Measured using an automated benchmark suite (`tsx`) against the live PostgreSQL database and API server across OWNER and EMPLOYEE roles:
+
+| Endpoint / User Journey | Role | Baseline Median | Post-Fix Median | Improvement / Note |
+|---|---|---|---|---|
+| `GET /api/v1/closings/current` | OWNER | 21.05 ms | 18.12 ms | **~14% faster** (pre-loaded payment methods, eliminated duplicate branch calculations) |
+| `GET /api/v1/dashboard/owner?trendRange=today` | OWNER | 17.72 ms | 17.21 ms | Faster, cached master data |
+| `GET /api/v1/dashboard/employee` | EMPLOYEE | 10.87 ms | 10.61 ms | Consistent sub-11ms response |
+| `GET /api/v1/reports/sales` | OWNER | 14.34 ms | 14.11 ms | Consistent sub-15ms response |
+| `GET /api/v1/auth/me` | OWNER | 2.50 ms | 2.22 ms | Fast baseline |
+
+**Database Execution Timings (`EXPLAIN ANALYZE` on local PostgreSQL)**:
+- Daily closing expected cash calculation: `0.353 ms` (Execution Time)
+- Inventory balances projection: `0.061 ms` (Execution Time)
+- Notifications unread count: `0.036 ms` (Execution Time)
+- Audit logs query: `0.037 ms` (Execution Time)
+
+### 3. Root Causes Diagnosed & Solutions Implemented
+1. **Login Cache Seeding & User Fetch Harmonization**:
+   - `Login.tsx` now immediately primes the React Query cache via `queryClient.setQueryData(["me"], { user: data.user })`.
+   - `useQuery` calls for `["me"]` configured with `staleTime: 5 * 60 * 1000` (5 minutes) and `retry: false`, completely eliminating redundant immediate round-trips to `/auth/me` on login and cross-tab route transitions.
+2. **Master Data Cache Consistency**:
+   - `useBranches`, `useCategories`, `useProducts`, and `usePaymentMethods` configured with standard 3–5 minute `staleTime`.
+   - Replaced raw inline `fetchApi("/branches")` in `OwnerDashboard.tsx` and `ReportsPage.tsx` with `useBranches({ enabled: isOwner })`.
+   - Harmonized `usePaymentMethods` across the application, removing duplicate un-cached definitions.
+3. **Gated Modal Queries**:
+   - `OpeningStockModal.tsx` and `StockAdjustmentModal.tsx` previously fired `useProducts()` unconditionally on every parent page render even when closed. Now gated with `enabled: isOpen`.
+4. **Premature / Un-gated Inventory Requests**:
+   - `CurrentInventoryPage.tsx` and `MovementsPage.tsx` previously triggered double-mount fetches (one before session resolution with empty branch, and one after). Now strictly gated with `enabled: isReady` (where `isReady = Boolean(user) && (isOwner ? true : Boolean(effectiveBranchId))`).
+   - `NewSalePage.tsx`, `NewTransferPage.tsx`, and `NewReturnPage.tsx` inventory balance queries gated with `enabled: Boolean(branchId)`.
+5. **Role Gating for Owner-Only Modules**:
+   - In `ReceivingsPage.tsx` and `NewReceivingPage.tsx`, queries for receivings, suppliers, and products now pass `{ enabled: isOwner }`, preventing employees from triggering HTTP 403 Forbidden error storms.
+6. **Notifications Polling Safeguard**:
+   - In `apps/web/src/features/notifications/api.ts`, added `refetchIntervalInBackground: false`, `staleTime: 30000`, and gated unread polling in `Header.tsx` with `enabled: Boolean(user)`.
+7. **Mutation Retries Protection**:
+   - In `apps/web/src/app/providers/index.tsx`, configured `mutations: { retry: false }` to strictly prevent automatic retries of non-idempotent financial mutations (sales, returns, transfers, closings) on transient network glitches.
+8. **Backend Closing Computation Optimization**:
+   - In `apps/api/src/modules/closing/service.ts`, preloaded active payment methods once prior to the branch aggregation loop instead of querying them repeatedly per branch, and reused `liveCalculations` when `b.id === targetBranchId`.
+
+### 4. Quality Check Results
+- **Automated Tests**: **44 test files, 307 / 307 tests passed** (`npm test`).
+- **TypeScript Strict Typecheck**: `npm run typecheck` passed with **0 errors** across both `@gelana-inventory-and-sales-management-system/api` and `@gelana-inventory-and-sales-management-system/web`.
+- **Linter**: `npm run lint` passed with **0 errors** across all workspaces.
+- **Production Build**: `npm run build` passed with **0 errors**, generating clean production bundles.
+
+### 5. Next Steps
+- **Performance Phase 2**: Improve responsive layouts throughout the application. (COMPLETED)
+- **Performance Phase 3**: Conduct deeper database indexing and API query optimization.
+- **Performance Phase 4**: Perform security and comprehensive regression verification.
+
+---
+
+## Phase 2 — Application-Wide Responsive UI Optimization
+
+**Status**: Completed
+
+### 1. Objective & Scope
+- **Focus**: Eliminate horizontal overflow, element clipping, rigid widths, and broken layouts across mobile phones (320px, 360px, 390px, 430px), tablets (768px, 1024px), and desktop (1280px+).
+- **Core Principle**: Fix the root layout constraints at the component level (`min-w-0`, responsive padding, flex-wrap, responsive grids, localized horizontal table containers) rather than masking bugs with global `overflow-x: hidden`.
+- **Strict Boundary**: Preserved the existing design system (Plus Jakarta Sans typography, surface tokens, border radiuses, shadows, brand colors), existing permissions, online-only architecture (Milestone 12 permanently skipped), and all business logic.
+
+### 2. Audited Areas & Root Causes Diagnosed
+1. **Application Shell & Navigation**:
+   - `AppShell.tsx`: Root `<main>` had rigid desktop padding `p-margin` (32px = 64px total horizontal margin), which left only 256px on 320px screens. Resolved to responsive `p-4 sm:p-6 md:p-margin`.
+   - `Sidebar.tsx`: On mobile, when the sidebar was collapsed on desktop, opening the mobile drawer rendered a 72px icon rail. Fixed with `effectiveCollapsed = isCollapsed && !isMobileOpen`, rendering a full 288px drawer (`w-72 max-w-[85vw]`) with expanded text and mobile close button.
+   - `Header.tsx`: Header padding reduced from `px-margin` to `px-4 sm:px-6 md:px-margin`. Breadcrumb product names given responsive truncation (`max-w-[120px] sm:max-w-xs`), and long branch status text hidden on mobile screens.
+2. **Dashboards**:
+   - `OwnerDashboard.tsx`: Action cards grid changed from rigid 3-columns to `grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5`. KPI card paddings scaled to `p-4 sm:p-5`, KPI values given `text-2xl sm:text-headline-xl break-words min-w-0`, and Sales Trend toolbar buttons given `flex-wrap gap-1.5`.
+   - `EmployeeDashboard.tsx`: Operational cards grid changed from rigid 3-columns to `grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5`. Quick metrics given `text-2xl sm:text-headline-xl break-words min-w-0`.
+3. **Core Workflows & Point of Sale**:
+   - `NewSalePage.tsx`: Had a rigid `w-[420px] shrink-0` right sidebar with `overflow-hidden` container, breaking entirely on screens <1024px. Refactored into a vertical-stack on mobile (`flex flex-col lg:flex-row gap-6 min-h-0`), with bounded catalog height (`max-h-[45vh] lg:max-h-none`) and responsive cart drawer (`w-full lg:w-[400px] xl:w-[420px]`).
+   - `NewReturnPage.tsx`: Return mode selector tabs (`flex inline-flex`) spanned >570px wide, creating massive horizontal overflow on mobile. Refactored to `flex flex-col sm:inline-flex sm:flex-row gap-1 w-full sm:w-auto`.
+   - `NewReceivingPage.tsx`: Product intake rows converted to `flex flex-col sm:flex-row gap-2`.
+   - `CurrentClosingPage.tsx`: Lifecycle progress indicator labels changed to `flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2` to prevent badge collision.
+   - `TransferDetailsPage.tsx`: 5-step lifecycle cards grid changed from `grid-cols-1 md:grid-cols-5` to `grid-cols-1 sm:grid-cols-2 lg:grid-cols-5`.
+4. **Modals & Drawers**:
+   - `ProductUnitsModal.tsx`: Added `overflow-x-auto` to table wrapper and responsive padding `p-4 sm:p-6`.
+   - `ReceivingDetailsDrawer.tsx`: Replaced `overflow-hidden` with `overflow-x-auto` on received items table, info grid changed to `grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6`, and drawer padding updated to `p-4 sm:p-space-lg`.
+   - `OpeningStockModal.tsx` & `StockAdjustmentModal.tsx`: Modal footers refactored to `flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 sm:gap-3` with full-width touch targets on small phones.
+   - `InventoryDrawer.tsx`: Updated drawer header and body padding to `p-4 sm:p-6`.
+5. **Reports & Filter Toolbars**:
+   - `ReportsPage.tsx`: Navigation tabs updated from rigid 4-column grid to `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`.
+   - `SalesReportsTab.tsx`, `ClosingReportsTab.tsx`, `ProfitReportsTab.tsx`: Added `flex-wrap gap-1` to date preset filter pill containers.
+   - `InventoryReportsTab.tsx`: Added `flex-wrap gap-1` to sub-view toggle buttons.
+   - `ReceivingsPage.tsx`: Filter bar updated to `flex flex-col sm:flex-row gap-3`.
+   - `Catalog.tsx`: Action button bar updated to `flex flex-wrap gap-2 sm:gap-3`.
+   - `AuditLogPage.tsx`: Search and date filter controls updated to `flex-wrap gap-3`.
+   - `NotificationsPage.tsx`: Filter tabs container updated to `flex-wrap`.
+
+### 3. Quality Check Results
+- **Automated Tests**: **19 web test files, 108 / 108 tests passed** (`npx vitest run apps/web`). Added `SidebarResponsive.test.tsx` verifying responsive drawer transitions and mobile collapse behavior.
+- **TypeScript Strict Typecheck**: `npm run typecheck` passed with **0 errors** across both `@gelana-inventory-and-sales-management-system/api` and `@gelana-inventory-and-sales-management-system/web`.
+- **Linter**: `npm run lint` passed with **0 errors** across all workspaces.
+- **Production Build**: `npm run build` passed with **0 errors**, generating clean production bundles.
+
+### 4. Next Steps
+- **Phase 3**: Conduct deeper database and API query optimization.
+- **Phase 4**: Perform security hardening and comprehensive regression verification.

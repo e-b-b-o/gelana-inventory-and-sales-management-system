@@ -9,11 +9,15 @@ import { ReceivingDetailsDrawer } from "./ReceivingDetailsDrawer";
 import { Link } from "react-router-dom";
 
 export function ReceivingsPage() {
-  const { data: userResponse } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { data: userResponse } = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    staleTime: 5 * 60 * 1000,
+  });
   const isOwner = userResponse?.user?.role === "OWNER";
   
-  const { data: branches = [] } = useBranches();
-  const { data: suppliersData } = useSuppliers();
+  const { data: branches = [] } = useBranches({ enabled: isOwner });
+  const { data: suppliersData } = useSuppliers({ enabled: isOwner });
   const suppliers = suppliersData || [];
   
   const [branchId, setBranchId] = useState("");
@@ -22,12 +26,10 @@ export function ReceivingsPage() {
   const limit = 50;
   const [selectedReceivingId, setSelectedReceivingId] = useState<string | null>(null);
 
-  const { data, isLoading } = useReceivings({ 
-    branchId, 
-    supplierId, 
-    page, 
-    limit 
-  });
+  const { data, isLoading } = useReceivings(
+    { branchId, supplierId, page, limit },
+    { enabled: isOwner }
+  );
   
   const receivings = data?.data || [];
   const meta = data?.meta;
@@ -65,7 +67,7 @@ export function ReceivingsPage() {
 
       {/* FILTER BAR */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-4 mb-space-lg">
-        <div className="flex flex-col lg:flex-row gap-3 items-center w-full">
+        <div className="flex flex-col sm:flex-row gap-3 items-center w-full">
           <div className="w-full lg:w-[220px] shrink-0">
             <select 
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-dark-slate focus:border-primary outline-none cursor-pointer"

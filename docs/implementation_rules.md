@@ -205,10 +205,10 @@ Keep:
 * reusable UI
 appropriately separated.
 
-## Rule 16 — No Premature Offline Implementation
+## Rule 16 — Online-Only Architecture (Milestone 12 Skipped)
 
-Do not implement offline/synchronization before the online business system is stable.
-However, write online code in a way that does not make future offline support unnecessarily difficult.
+Gelana operates strictly as an online-only application by project decision.
+Do not implement offline storage, local transaction queues, background synchronization, or offline conflict resolution. All transactions execute online with atomic PostgreSQL transactional boundaries.
 
 ## Rule 17 — Test Business Rules, Not Just Code
 

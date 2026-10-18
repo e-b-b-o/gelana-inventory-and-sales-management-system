@@ -85,10 +85,27 @@ The project is built using incremental end-to-end vertical slices.
 ### Slice 10.5 — Profit Reports
 ### Slice 10.6 — Closing Reports
 
-## 13. Milestone 11 — Notifications & Audit
+## 13. Milestone 11 — Notifications & Audit (Completed)
 
-## 14. Milestone 12 — Offline & Synchronization
+### Slice 11.1 — Notifications (Completed)
+### Slice 11.2 — Audit Log (Completed)
+### Slice 11.3 — Settings & Account Management (Completed)
 
-## 15. Milestone 13 — Full Verification
+## 14. Milestone 12 — Offline Mode (**Skipped — Out of Scope by Project Decision**)
 
-## 16. Milestone 14 — Production Hardening
+Gelana has deliberately adopted an **online-only architecture** to minimize operational risk and maintenance complexity. Offline operation, local storage sync queues, offline conflict resolution, and background sync engines are intentionally skipped and will not be implemented. Milestone 12 is permanently skipped by architectural decision and does not block Milestone 13 or Milestone 14.
+
+## 15. Milestone 13 — Full Verification (Completed)
+
+### Verification Scope:
+- **Authentication & Authorization**: Session/cookie authentication, role permissions (Owner vs Employee), backend zero-trust boundary, branch isolation.
+- **Master Data & Inventory**: Product/unit/category management, branch balances, receiving, immutable inventory movement ledger, authoritative WAC calculations, stock availability, prevention of negative inventory.
+- **Sales & Returns**: Sales checkout, stock reduction, payment allocations, sellable/damaged return routing, refund reconciliation, owner-only voids/corrections with audit records.
+- **Stock Transfers**: Complete lifecycle (`REQUESTED` → `APPROVED`/`REJECTED` → `DISPATCHED` → `RECEIVED` → `COMPLETED`), in-transit inventory, discrepancy handling with mandatory reasons.
+- **Daily Closing**: Authoritative expected cash calculation, cash discrepancy enforcement, owner approval/rejection workflows, closing history with branch scoping.
+- **Dashboards & Reports**: Owner vs Employee dashboards, branch isolation, sales/inventory/profit/closing reports, strict exclusion of cost/WAC/gross profit data from employee payloads.
+- **Cross-Module Integration**: End-to-end data consistency across all business contexts.
+- **Automated Quality Checks**: Monorepo test suites passing (44 test files, 307/307 tests passing), TypeScript strict typecheck passing (0 errors), Oxlint passing (0 errors), and production build passing.
+
+## 16. Milestone 14 — Production Hardening (Next Active Milestone)
+

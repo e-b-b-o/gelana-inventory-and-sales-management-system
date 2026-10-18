@@ -204,55 +204,57 @@ export function SalesReportsTab({ isOwner, branchesData }: SalesReportsTabProps)
       <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-4 shadow-bento flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           {/* Quick Date Presets */}
-          <div className="flex items-center bg-surface-container-low border border-outline-variant/70 rounded-xl p-1">
-            <span className="material-symbols-outlined text-outline ml-1.5 mr-1 text-base">calendar_today</span>
-            <button
-              type="button"
-              onClick={() => handlePresetChange("today")}
-              className={`px-3 py-1.5 text-label-sm font-label-sm rounded-lg transition-colors ${
-                datePreset === "today"
-                  ? "bg-primary text-on-primary font-semibold shadow-xs"
-                  : "text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePresetChange("7days")}
-              className={`px-3 py-1.5 text-label-sm font-label-sm rounded-lg transition-colors ${
-                datePreset === "7days"
-                  ? "bg-primary text-on-primary font-semibold shadow-xs"
-                  : "text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              Last 7 Days
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePresetChange("month")}
-              className={`px-3 py-1.5 text-label-sm font-label-sm rounded-lg transition-colors ${
-                datePreset === "month"
-                  ? "bg-primary text-on-primary font-semibold shadow-xs"
-                  : "text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              This Month
-            </button>
-            <button
-              type="button"
-              onClick={() => setDatePreset("custom")}
-              className={`px-3 py-1.5 text-label-sm font-label-sm rounded-lg transition-colors ${
-                datePreset === "custom"
-                  ? "bg-primary text-on-primary font-semibold shadow-xs"
-                  : "text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              Custom
-            </button>
+          <div className="flex flex-wrap items-center bg-surface-container-low border border-outline-variant/70 rounded-xl p-1 gap-1">
+            <div className="flex items-center">
+              <span className="material-symbols-outlined text-outline ml-1.5 mr-1 text-base">calendar_today</span>
+              <button
+                type="button"
+                onClick={() => handlePresetChange("today")}
+                className={`px-3 py-1.5 text-label-sm font-label-sm rounded-lg transition-colors ${
+                  datePreset === "today"
+                    ? "bg-primary text-on-primary font-semibold shadow-xs"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePresetChange("7days")}
+                className={`px-3 py-1.5 text-label-sm font-label-sm rounded-lg transition-colors ${
+                  datePreset === "7days"
+                    ? "bg-primary text-on-primary font-semibold shadow-xs"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Last 7 Days
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePresetChange("month")}
+                className={`px-3 py-1.5 text-label-sm font-label-sm rounded-lg transition-colors ${
+                  datePreset === "month"
+                    ? "bg-primary text-on-primary font-semibold shadow-xs"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                This Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setDatePreset("custom")}
+                className={`px-3 py-1.5 text-label-sm font-label-sm rounded-lg transition-colors ${
+                  datePreset === "custom"
+                    ? "bg-primary text-on-primary font-semibold shadow-xs"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Custom
+              </button>
+            </div>
 
-            <span className="h-4 w-px bg-outline-variant/60 mx-1"></span>
-            <span className="px-2 text-label-sm font-label-sm text-on-surface font-medium">
+            <span className="hidden sm:inline-block h-4 w-px bg-outline-variant/60 mx-1"></span>
+            <span className="px-2 text-label-sm font-label-sm text-on-surface font-medium w-full sm:w-auto text-left">
               {startDate} – {endDate}
             </span>
           </div>

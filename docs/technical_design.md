@@ -8,7 +8,7 @@ This document defines how the Gelana Inventory & Sales Management System should 
 - **Immutability of Financials**: Completed sales and inventory movements are never hard-deleted. Mistakes are corrected via audited void/reversal workflows.
 - **Source of Truth**: The central PostgreSQL database is the ultimate authority.
 - **Transactional Safety**: All multi-step mutations must be wrapped in ACID transactions.
-- **Idempotency**: The system must tolerate retried requests gracefully, enabling future offline sync.
+- **Idempotency**: The system tolerates retried requests gracefully and prevents duplicate submissions.
 
 ## 3. Target Architecture
 A **Modular Monolith** organized by business domains.
@@ -38,7 +38,7 @@ Feature-sliced design. TanStack Query for server state caching. Zustand for mini
 - **Authorization**: Role-based (Owner/Employee) and Branch-scoped. Branch scope is securely derived from the authenticated context (`req.user.branchId`), not from client payloads.
 
 ## 9. Database Architecture
-Primary Keys are UUIDs to support offline generation without collisions. Soft Deletes (`is_active` flag) are used for Master Data instead of hard deletions.
+Primary Keys are UUIDs. Soft Deletes (`is_active` flag) are used for Master Data instead of hard deletions.
 
 ### 9.1 Indexing Targets
 Add indexes based on real query patterns, especially:
@@ -111,7 +111,7 @@ Creates a separate reversal record. The original transaction remains intact for 
 Lifecycle: `Requested → Approved → Dispatched → Received → Completed`. Dispatched decreases source stock and increases in-transit stock. Received decreases in-transit stock and increases destination stock.
 
 ## 18. Daily Closing
-Blocked if pending offline data exists. Reconciles payment method totals. Requires Owner approval to lock the business day.
+Reconciles payment method totals. Requires Owner approval to lock the business day. Daily closing operates directly against authoritative online PostgreSQL transactions.
 
 ## 19. Reports
 Driven by the immutable cost snapshots and ledgers.
@@ -123,7 +123,7 @@ System alerts for low stock, pending transfers, and rejected closings.
 Immutable table tracking sensitive business actions.
 
 ## 22. Transaction IDs
-**UUIDs** are the permanent technical identities. **Human-readable IDs** (`SAL-000123`) are assigned strictly by the central server (upon synchronization for offline events).
+**UUIDs** are the permanent technical identities. **Human-readable IDs** (`SAL-000123`) are assigned sequentially by the central server.
 
 ## 23. Business Date & Time
 Stored as UTC timestamps. Business date is derived using the local business timezone. Delayed/paper sales preserve their actual occurrence date alongside the entry date.
@@ -138,8 +138,8 @@ Flow: API Input Validation (Zod) → Authorization → Business Logic Validation
 ## 26. Error Handling
 Standardized JSON format: `{ error: { code, message, details } }`.
 
-## 27. Future Offline Architecture
-React app → Local storage cache (IndexedDB) → Pending Sync Queue → Central Server. Source of truth is always PostgreSQL.
+## 27. Online-Only Architecture Scope (Milestone 12 Skipped)
+Gelana operates strictly as an online-only application by project decision AD-01. Milestone 12 (Offline Mode) was permanently skipped to preserve strict transactional consistency and inventory integrity. No local offline queues, IndexedDB transaction stores, or background sync engines are implemented or supported. PostgreSQL transactions are the sole authority for all business operations.
 
 ## 28. Backup & Recovery
 Automated daily PostgreSQL logical backups.

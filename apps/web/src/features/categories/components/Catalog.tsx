@@ -81,7 +81,7 @@ export function Catalog() {
             Manage catalog items, base & alternate selling units, and multi-branch stock availability.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           {isOwner && (
             <>
               <button

@@ -110,7 +110,7 @@ export function InventoryReportsTab({ isOwner, branchesData }: InventoryReportsT
       <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-4 shadow-bento flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           {/* Sub-view Toggle */}
-          <div className="flex items-center bg-surface-container-low border border-outline-variant/70 rounded-xl p-1">
+          <div className="flex flex-wrap items-center bg-surface-container-low border border-outline-variant/70 rounded-xl p-1 gap-1">
             <button
               type="button"
               onClick={() => {

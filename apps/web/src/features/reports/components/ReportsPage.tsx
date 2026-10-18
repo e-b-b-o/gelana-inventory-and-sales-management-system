@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getMe } from "../../auth/api/auth";
-import { fetchApi } from "../../../lib/api";
+import { useBranches } from "../../branches/api";
 import { SalesReportsTab } from "./SalesReportsTab";
 import { InventoryReportsTab } from "./InventoryReportsTab";
 import { ProfitReportsTab } from "./ProfitReportsTab";
@@ -16,20 +16,13 @@ export function ReportsPage() {
   const { data: meData } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
   const user = meData?.user;
   const isOwner = user?.role === "OWNER";
 
   // Branches list for filter dropdown (Owner only)
-  const { data: branchesData } = useQuery({
-    queryKey: ["branches"],
-    queryFn: async () => {
-      const res = await fetchApi("/branches");
-      return res.data;
-    },
-    enabled: isOwner,
-  });
+  const { data: branchesData = [] } = useBranches({ enabled: isOwner });
 
   // Guard against non-owner accessing profit tab
   const currentTab: ReportTab = !isOwner && activeTab === "profit" ? "sales" : activeTab;
@@ -48,7 +41,7 @@ export function ReportsPage() {
 
       {/* 2. Report Navigation: Segmented Control Tabs */}
       <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-2 shadow-bento">
-        <div className={`grid grid-cols-1 ${isOwner ? "md:grid-cols-4" : "md:grid-cols-3"} gap-2`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${isOwner ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-2`}>
           {/* Tab 1: Sales Reports */}
           <button
             type="button"

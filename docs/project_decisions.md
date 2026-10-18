@@ -485,11 +485,7 @@ Closing can show/reconcile totals by payment method.
 
 ### Decision
 
-Yes.
-
-Required pending offline data must synchronize before closing.
-
-If required pending synchronization remains, closing is blocked.
+*(Historical Context: Originally required offline synchronization prior to closing. Formally superseded by Architectural Decision AD-01: Gelana operates strictly as an online-only application; Milestone 12 Offline Mode is skipped, so offline transaction queues and pending synchronization do not exist. Daily closing operates directly on authoritative PostgreSQL database state).*
 
 ---
 
@@ -3162,6 +3158,10 @@ The original action remains preserved.
 
 # 28. Offline Rules
 
+> [!NOTE]
+> **Status: Formally Superseded by Architectural Decision AD-01.**
+> Milestone 12 (Offline Mode) was permanently skipped. Gelana operates strictly as an online-only application. Operations (Sales, Returns, Transfers, Adjustments, Closings) execute online against the central PostgreSQL database. Offline storage, local queues, and sync retry mechanisms are not implemented.
+
 ## BR-207 — Employee Offline Sales
 
 Employees can perform normal sales while temporarily offline.
@@ -3240,6 +3240,10 @@ Required pending transactions must synchronize before daily closing.
 ---
 
 # 29. Offline Conflict Rules
+
+> [!NOTE]
+> **Status: Formally Superseded by Architectural Decision AD-01.**
+> Because Gelana operates as an online-only application without local transaction queues or deferred synchronization, offline sync conflicts are out of scope. Invariants such as preventing negative inventory are enforced synchronously online within ACID transaction boundaries.
 
 ## BR-217 — No Silent Transaction Deletion
 
@@ -8910,3 +8914,24 @@ Step 7 will define the actual visual interface, including:
 * Owner interface
 * Employee interface
 * Screen-by-screen visual design
+
+---
+
+# 7. Architecture Decisions & Scope Clarifications
+
+## AD-01 — Online-Only Architecture & Formal Milestone 12 Skip
+
+**Status**: Formally Adopted
+
+### Decision
+Gelana operates strictly as an **online-only application**. Milestone 12 (Offline Mode & Synchronization) is formally **Skipped — Out of Scope by Project Decision**.
+
+### Rationale
+To drastically reduce operational risk, eliminate distributed data consistency issues, and minimize maintenance complexity, Gelana enforces centralized transactional integrity. Local offline queues, browser storage synchronization, conflict resolution matrices, and background sync engines are intentionally excluded from the product scope.
+
+### Invariant Rules
+1. **Central Authority**: The central PostgreSQL database accessed via the Express REST API is the sole source of truth for all branches and roles.
+2. **Synchronous ACID Transactions**: All operational transactions (Sales, Returns, Stock Transfers, Adjustments, Receiving, and Daily Closing) execute online inside atomic PostgreSQL database transactions.
+3. **No Offline Storage or Sync Queues**: No offline queues, client-side transaction caches, or deferred synchronization workers shall be implemented or scheduled. Milestone 12 is intentionally and permanently skipped.
+4. **Milestone Progression**: The intentional skip of Milestone 12 does not block Milestone 13 (Full Verification, now completed) or Milestone 14 (Production Hardening, the subsequent active milestone).
+

@@ -37,8 +37,9 @@ Then inspect the relevant existing code before editing anything.
     mutations.
 -   Completed financial records are not hard-deleted; use auditable
     reversal/void workflows.
--   Do not add offline/PWA complexity until the online workflow is
-    stable and the progress document reaches that phase.
+-   Gelana operates strictly as an online-only application (Milestone 12
+    is permanently skipped). Do not add offline/PWA complexity, local
+    transaction sync queues, or offline conflict resolution.
 -   Never commit secrets, `.env`, credentials, tokens, generated build
     output, or `node_modules`.
 -   Do not run destructive database/Git commands unless explicitly
