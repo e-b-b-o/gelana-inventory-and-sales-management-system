@@ -59,12 +59,13 @@ export function AppShell() {
   const { data } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
-    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: () => {
+      queryClient.clear();
       queryClient.setQueryData(["me"], null);
     },
   });
@@ -93,7 +94,7 @@ export function AppShell() {
       >
         <Header user={user} onOpenMobile={() => setIsMobileOpen(true)} />
         <div className="flex-1 overflow-y-auto">
-          <main className="p-margin max-w-7xl w-full mx-auto pb-12">
+          <main className="p-4 sm:p-6 md:p-margin max-w-7xl w-full mx-auto pb-12">
             <Outlet />
           </main>
         </div>

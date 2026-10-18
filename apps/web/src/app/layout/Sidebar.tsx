@@ -476,6 +476,7 @@ export function Sidebar({
   isMobileOpen = false,
   onCloseMobile,
 }: SidebarProps) {
+  const effectiveCollapsed = isCollapsed && !isMobileOpen;
   const location = useLocation();
   const { data: unreadData } = useUnreadCountQuery();
   const unreadCount = unreadData?.unreadCount ?? 0;
@@ -484,7 +485,7 @@ export function Sidebar({
   // Close flyout on collapse change or route change
   useEffect(() => {
     setOpenFlyoutGroup(null);
-  }, [isCollapsed, location.pathname]);
+  }, [effectiveCollapsed, location.pathname]);
 
   // Handle outside click & Escape to close flyout
   useEffect(() => {
@@ -541,18 +542,18 @@ export function Sidebar({
 
       {/* Main Sidebar Element */}
       <aside
-        className={`fixed left-0 top-0 h-screen flex flex-col justify-between bg-surface-container-lowest border-r border-outline-variant/70 shadow-sm z-50 shrink-0 transition-[width] duration-200 ease-in-out ${
-          isCollapsed ? "w-[72px]" : "w-64"
+        className={`fixed left-0 top-0 h-screen flex flex-col justify-between bg-surface-container-lowest border-r border-outline-variant/70 shadow-sm z-50 shrink-0 transition-[width,transform] duration-200 ease-in-out w-72 max-w-[85vw] ${
+          effectiveCollapsed ? "md:w-[72px]" : "md:w-64"
         } ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <div
           className={`${
-            isCollapsed ? "px-2.5 py-3" : "px-3.5 py-3"
+            effectiveCollapsed ? "px-2.5 py-3" : "px-3.5 py-3"
           } flex flex-col h-full overflow-hidden w-full`}
         >
           {/* Header & Logo + Collapse Toggle */}
           <div className="mb-3 pb-3 border-b border-outline-variant/60">
-            {isCollapsed ? (
+            {effectiveCollapsed ? (
               <div className="w-full flex flex-col items-center gap-2">
                 <img
                   alt="Gelana Stationery Logo"
@@ -618,14 +619,14 @@ export function Sidebar({
               to="/"
               label="Dashboard"
               icon="dashboard"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               onCloseMobile={onCloseMobile}
             />
 
             <NavGroup
               label="Sales"
               icon="point_of_sale"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               isOpenFlyout={openFlyoutGroup === "Sales"}
               onToggleFlyout={() => setOpenFlyoutGroup((prev) => (prev === "Sales" ? null : "Sales"))}
               onCloseFlyout={() => setOpenFlyoutGroup(null)}
@@ -640,7 +641,7 @@ export function Sidebar({
             <NavGroup
               label="Inventory"
               icon="inventory_2"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               isOpenFlyout={openFlyoutGroup === "Inventory"}
               onToggleFlyout={() => setOpenFlyoutGroup((prev) => (prev === "Inventory" ? null : "Inventory"))}
               onCloseFlyout={() => setOpenFlyoutGroup(null)}
@@ -655,14 +656,14 @@ export function Sidebar({
               to="/transfers"
               label="Transfers"
               icon="sync_alt"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               onCloseMobile={onCloseMobile}
             />
             <NavItem
               to="/catalog"
               label="Products & Categories"
               icon="category"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               onCloseMobile={onCloseMobile}
             />
 
@@ -672,14 +673,14 @@ export function Sidebar({
                   to="/suppliers"
                   label="Suppliers"
                   icon="local_shipping"
-                  isCollapsed={isCollapsed}
+                  isCollapsed={effectiveCollapsed}
                   onCloseMobile={onCloseMobile}
                 />
                 <NavItem
                   to="/receivings"
                   label="Receivings"
                   icon="inbox"
-                  isCollapsed={isCollapsed}
+                  isCollapsed={effectiveCollapsed}
                   onCloseMobile={onCloseMobile}
                 />
               </>
@@ -688,7 +689,7 @@ export function Sidebar({
             <NavGroup
               label="Daily Closing"
               icon="lock_clock"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               isOpenFlyout={openFlyoutGroup === "Daily Closing"}
               onToggleFlyout={() => setOpenFlyoutGroup((prev) => (prev === "Daily Closing" ? null : "Daily Closing"))}
               onCloseFlyout={() => setOpenFlyoutGroup(null)}
@@ -703,7 +704,7 @@ export function Sidebar({
               to="/reports"
               label="Reports"
               icon="bar_chart"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               onCloseMobile={onCloseMobile}
             />
 
@@ -712,7 +713,7 @@ export function Sidebar({
                 to="/users"
                 label="Users & Branches"
                 icon="badge"
-                isCollapsed={isCollapsed}
+                isCollapsed={effectiveCollapsed}
                 onCloseMobile={onCloseMobile}
               />
             )}
@@ -722,7 +723,7 @@ export function Sidebar({
                 to="/audit-logs"
                 label="Audit Log"
                 icon="policy"
-                isCollapsed={isCollapsed}
+                isCollapsed={effectiveCollapsed}
                 onCloseMobile={onCloseMobile}
               />
             )}
@@ -731,7 +732,7 @@ export function Sidebar({
               to="/notifications"
               label="Notifications"
               icon="notifications"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               onCloseMobile={onCloseMobile}
               badge={
                 unreadCount > 0 ? (
@@ -746,14 +747,14 @@ export function Sidebar({
               to="/settings"
               label="Settings"
               icon="settings"
-              isCollapsed={isCollapsed}
+              isCollapsed={effectiveCollapsed}
               onCloseMobile={onCloseMobile}
             />
           </nav>
 
           {/* Profile & Logout Footer */}
           <div className="pt-3 border-t border-outline-variant/60 mt-auto">
-            {isCollapsed ? (
+            {effectiveCollapsed ? (
               <div className="flex flex-col items-center gap-2 py-1">
                 <div
                   title={user?.name || "User"}

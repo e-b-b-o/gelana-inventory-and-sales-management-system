@@ -122,7 +122,7 @@ interface HeaderProps {
 export function Header({ user, onOpenMobile }: HeaderProps) {
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { data: unreadData } = useUnreadCountQuery();
+  const { data: unreadData } = useUnreadCountQuery({ enabled: Boolean(user) });
   const unreadCount = (unreadData as any)?.unreadCount ?? (unreadData as any)?.data?.unreadCount ?? 0;
 
   // Robust breadcrumb generation supporting dynamic detail routes and query cache lookup
@@ -146,11 +146,11 @@ export function Header({ user, onOpenMobile }: HeaderProps) {
                 chevron_right
               </span>
               {isLast ? (
-                <span className="text-primary font-semibold truncate max-w-[200px] sm:max-w-xs" title={label}>
+                <span className="text-primary font-semibold truncate max-w-[120px] sm:max-w-xs" title={label}>
                   {label}
                 </span>
               ) : (
-                <Link to={targetUrl} className="hover:text-primary transition-colors truncate max-w-[150px]">
+                <Link to={targetUrl} className="hover:text-primary transition-colors truncate max-w-[80px] sm:max-w-[150px]">
                   {label}
                 </Link>
               )}
@@ -162,14 +162,14 @@ export function Header({ user, onOpenMobile }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-20 h-14 bg-surface-container-lowest border-b border-outline-variant px-margin flex items-center justify-between shrink-0">
+    <header className="sticky top-0 z-20 h-14 bg-surface-container-lowest border-b border-outline-variant px-4 sm:px-6 md:px-margin flex items-center justify-between shrink-0">
       {/* Breadcrumb Hierarchy */}
-      <div className="flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant">
+      <div className="flex items-center gap-2 text-body-sm font-body-sm text-on-surface-variant min-w-0 overflow-hidden mr-2">
         {onOpenMobile && (
           <button
             type="button"
             onClick={onOpenMobile}
-            className="md:hidden p-1.5 -ml-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors cursor-pointer"
+            className="md:hidden p-1.5 -ml-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors cursor-pointer shrink-0"
             title="Open navigation"
             aria-label="Open navigation"
           >
@@ -180,12 +180,12 @@ export function Header({ user, onOpenMobile }: HeaderProps) {
       </div>
 
       {/* Trailing Status, Branch and Notification Controls */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-2 sm:gap-5 shrink-0">
         {/* Branch Selector / Indicator */}
-        <div className="flex items-center gap-1.5 px-3 py-1 bg-surface-container-low rounded border border-outline-variant">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 bg-surface-container-low rounded border border-outline-variant">
           <span className="material-symbols-outlined text-on-surface-variant text-[18px]">store</span>
-          <span className="text-label-md font-label-md text-on-surface">All Branches</span>
-          <span className="text-[10px] text-on-surface-variant font-normal">({user?.role === 'OWNER' ? 'Owner view' : 'Employee view'})</span>
+          <span className="text-label-md font-label-md text-on-surface whitespace-nowrap">All Branches</span>
+          <span className="hidden sm:inline text-[10px] text-on-surface-variant font-normal">({user?.role === 'OWNER' ? 'Owner view' : 'Employee view'})</span>
         </div>
 
         {/* Notification Bell Link */}
