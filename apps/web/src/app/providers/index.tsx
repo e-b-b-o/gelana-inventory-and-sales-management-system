@@ -31,6 +31,9 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: 60 * 1000, // 1 minute default freshness prevents spamming API on page switches
     },
+    mutations: {
+      retry: false, // Never automatically retry financial mutations (sales, returns, transfers, closings)
+    },
   },
 });
 

@@ -193,6 +193,26 @@ describe("AppShell and Routing behavior", () => {
       expect(screen.queryByText("We couldn't find the page you're looking for.")).toBeNull();
     });
 
+    it("resolves /audit-logs to AuditLogPage without rendering 404 fallback", async () => {
+      const { routes } = await import("./index");
+      const memoryRouter = createMemoryRouter(routes, {
+        initialEntries: ["/audit-logs"],
+      });
+
+      render(
+        <QueryClientProvider client={createTestClient()}>
+          <RouterProvider router={memoryRouter} />
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByRole("heading", { name: "Audit Log" })).toBeTruthy();
+      });
+
+      expect(screen.queryByText("Page not found")).toBeNull();
+      expect(screen.queryByText("We couldn't find the page you're looking for.")).toBeNull();
+    });
+
     it("verifies sidebar and top-bar notifications navigation links point to /notifications", async () => {
       const { routes } = await import("./index");
       const memoryRouter = createMemoryRouter(routes, {

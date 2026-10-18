@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { getMe } from "../../auth/api/auth";
 import { useInventoryBalances } from "../api";
 import { useBranches } from "../../branches/api";
@@ -10,7 +10,11 @@ import { OpeningStockModal } from "./OpeningStockModal";
 import { DisposalModal } from "./DisposalModal";
 
 export function CurrentInventoryPage() {
-  const { data: userResponse } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { data: userResponse } = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    staleTime: 5 * 60 * 1000,
+  });
   const isOwner = userResponse?.user?.role === "OWNER";
   const userBranchId = userResponse?.user?.branchId;
   const navigate = useNavigate();
@@ -30,8 +34,12 @@ export function CurrentInventoryPage() {
 
   // If not owner, enforce their branch
   const effectiveBranchId = isOwner ? branchId : (userBranchId || branchId);
+  const isReady = Boolean(userResponse?.user) && (isOwner ? true : Boolean(effectiveBranchId));
 
-  const { data, isLoading } = useInventoryBalances({ search, branchId: effectiveBranchId, categoryId, status });
+  const { data, isLoading } = useInventoryBalances(
+    { search, branchId: effectiveBranchId, categoryId, status },
+    { enabled: isReady }
+  );
   const balances = data?.data || [];
   
   const totalProducts = balances.length;

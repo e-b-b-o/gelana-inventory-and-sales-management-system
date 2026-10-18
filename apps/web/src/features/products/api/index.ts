@@ -30,13 +30,15 @@ export interface CreateProductInput {
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {}
 
-export const useProducts = () => {
+export const useProducts = (options?: { enabled?: boolean }) => {
   return useQuery<Product[]>({
     queryKey: ["products"],
     queryFn: async () => {
       const response = await fetchApi("/products");
       return response as Product[];
     },
+    staleTime: 3 * 60 * 1000,
+    enabled: options?.enabled,
   });
 };
 

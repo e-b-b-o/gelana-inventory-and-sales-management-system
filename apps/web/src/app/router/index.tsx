@@ -37,7 +37,7 @@ function ProtectedRoute() {
   const { data, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
-    retry: false
+    staleTime: 5 * 60 * 1000,
   });
 
   if (isLoading) return <div>Loading...</div>;
@@ -53,7 +53,7 @@ function PublicRoute() {
   const { data, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
-    retry: false
+    staleTime: 5 * 60 * 1000,
   });
 
   if (isLoading) return <div>Loading...</div>;

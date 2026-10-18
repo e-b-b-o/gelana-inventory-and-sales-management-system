@@ -30,13 +30,15 @@ export interface UpdateSupplierInput {
   notes?: string | null;
 }
 
-export const useSuppliers = () => {
+export const useSuppliers = (options?: { enabled?: boolean }) => {
   return useQuery<Supplier[]>({
     queryKey: ["suppliers"],
     queryFn: async () => {
       const response = await fetchApi("/suppliers");
       return response as Supplier[];
     },
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled,
   });
 };
 

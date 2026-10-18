@@ -21,13 +21,15 @@ export interface UpdatePaymentMethodInput {
   details?: string | null;
 }
 
-export const usePaymentMethods = () => {
+export const usePaymentMethods = (options?: { enabled?: boolean }) => {
   return useQuery<PaymentMethod[]>({
     queryKey: ["paymentMethods"],
     queryFn: async () => {
       const response = await fetchApi("/payment-methods");
       return response as PaymentMethod[];
     },
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled,
   });
 };
 

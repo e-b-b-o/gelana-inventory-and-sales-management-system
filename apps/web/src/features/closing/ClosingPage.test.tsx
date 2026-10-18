@@ -124,7 +124,6 @@ describe("Daily Closing Frontend Components (Slices 9.1 – 9.4)", () => {
             liveCalculations: null,
             checks: {
               allSalesRecorded: { passed: true, message: "37 of 37 sales entered for this business day." },
-              requiredSyncCompleted: { passed: true, message: "Online — All synced." },
               previousDayStatus: { passed: true, message: "Previous Day: October 13 closing was approved." },
             },
           },
@@ -155,7 +154,6 @@ describe("Daily Closing Frontend Components (Slices 9.1 – 9.4)", () => {
 
       // Verify Pre-Closing Readiness Checks
       expect(screen.getByText("37 of 37 sales entered for this business day.")).toBeTruthy();
-      expect(screen.getByText("Online — All synced.")).toBeTruthy();
 
       // Verify Submission form inputs
       expect(screen.getByLabelText(/Actual Physical Cash Counted/i)).toBeTruthy();
@@ -204,7 +202,6 @@ describe("Daily Closing Frontend Components (Slices 9.1 – 9.4)", () => {
             liveCalculations: null,
             checks: {
               allSalesRecorded: { passed: true, message: "All recorded" },
-              requiredSyncCompleted: { passed: true, message: "Synced" },
               previousDayStatus: { passed: true, message: "OK" },
             },
           },
@@ -285,7 +282,6 @@ describe("Daily Closing Frontend Components (Slices 9.1 – 9.4)", () => {
             liveCalculations: null,
             checks: {
               allSalesRecorded: { passed: true, message: "All recorded" },
-              requiredSyncCompleted: { passed: true, message: "Synced" },
               previousDayStatus: { passed: true, message: "OK" },
             },
             branchOverview: [
@@ -367,7 +363,6 @@ describe("Daily Closing Frontend Components (Slices 9.1 – 9.4)", () => {
             liveCalculations: null,
             checks: {
               allSalesRecorded: { passed: true, message: "OK" },
-              requiredSyncCompleted: { passed: true, message: "OK" },
               previousDayStatus: { passed: true, message: "OK" },
             },
           },

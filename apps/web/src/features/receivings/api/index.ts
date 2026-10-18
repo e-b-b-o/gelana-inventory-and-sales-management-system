@@ -58,10 +58,11 @@ export const getReceivings = async (query: GetReceivingsQuery) => {
   return await fetchApi(`/receivings?${params.toString()}`);
 };
 
-export const useReceivings = (query: GetReceivingsQuery) => {
+export const useReceivings = (query: GetReceivingsQuery, options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ["receivings", query],
     queryFn: () => getReceivings(query),
+    enabled: options?.enabled,
   });
 };
 

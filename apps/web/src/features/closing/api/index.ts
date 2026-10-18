@@ -104,7 +104,6 @@ export interface CurrentClosingResponse {
   } | null;
   checks: {
     allSalesRecorded: { passed: boolean; message: string };
-    requiredSyncCompleted: { passed: boolean; message: string };
     previousDayStatus: { passed: boolean; message: string };
   };
   branchOverview?: BranchOverviewItem[];

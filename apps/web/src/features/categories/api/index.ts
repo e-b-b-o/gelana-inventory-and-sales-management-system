@@ -8,13 +8,15 @@ export interface Category {
   createdAt: string;
 }
 
-export function useCategories() {
+export function useCategories(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
       const response = await fetchApi("/categories");
       return response.data as Category[];
     },
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled,
   });
 }
 

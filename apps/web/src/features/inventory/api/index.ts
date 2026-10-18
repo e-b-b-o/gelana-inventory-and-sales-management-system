@@ -19,10 +19,14 @@ export const getBalances = async (params: { branchId?: string; search?: string; 
   return parsed.data;
 };
 
-export const useInventoryBalances = (params: { branchId?: string; search?: string; categoryId?: string; status?: string }) => {
+export const useInventoryBalances = (
+  params: { branchId?: string; search?: string; categoryId?: string; status?: string } = {},
+  options?: { enabled?: boolean }
+) => {
   return useQuery({
     queryKey: ["inventory", "balances", params],
     queryFn: () => getBalances(params),
+    enabled: options?.enabled,
   });
 };
 
@@ -54,18 +58,22 @@ export const getMovements = async (params: {
   return parsed.data;
 };
 
-export const useInventoryMovements = (params: { 
-  branchId?: string; 
-  productId?: string;
-  movementType?: string;
-  startDate?: string;
-  endDate?: string;
-  page?: number;
-  limit?: number;
-}) => {
+export const useInventoryMovements = (
+  params: { 
+    branchId?: string; 
+    productId?: string;
+    movementType?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  } = {},
+  options?: { enabled?: boolean }
+) => {
   return useQuery({
     queryKey: ["inventory", "movements", params],
     queryFn: () => getMovements(params),
+    enabled: options?.enabled,
   });
 };
 

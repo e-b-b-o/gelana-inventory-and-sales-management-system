@@ -72,7 +72,7 @@ export function useNotificationsQuery(params: GetNotificationsParams = {}) {
   });
 }
 
-export function useUnreadCountQuery() {
+export function useUnreadCountQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["notifications", "unread-count"],
     queryFn: getUnreadCount,
@@ -81,7 +81,9 @@ export function useUnreadCountQuery() {
       if (status === 401 || status === 403) return false;
       return 30000;
     },
-    staleTime: 15000,
+    refetchIntervalInBackground: false,
+    staleTime: 30000,
+    enabled: options?.enabled,
   });
 }
 

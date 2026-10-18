@@ -6,7 +6,11 @@ import { format } from "date-fns";
 import { useBranches, type Branch } from "../../branches/api";
 
 export function MovementsPage() {
-  const { data: userResponse } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { data: userResponse } = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    staleTime: 5 * 60 * 1000,
+  });
   const isOwner = userResponse?.user?.role === "OWNER";
   
   const { data: branches = [] } = useBranches();
@@ -18,6 +22,8 @@ export function MovementsPage() {
   const [page, setPage] = useState(1);
   const limit = 50;
 
+  const isReady = Boolean(userResponse?.user);
+
   const { data, isLoading } = useInventoryMovements({ 
     branchId, 
     movementType, 
@@ -25,7 +31,7 @@ export function MovementsPage() {
     endDate: endDate ? new Date(endDate).toISOString() : undefined,
     page, 
     limit 
-  });
+  }, { enabled: isReady });
   
   const movements = data?.data || [];
   const meta = data?.meta;

@@ -7,7 +7,7 @@ export function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
-    staleTime: 60000,
+    staleTime: 5 * 60 * 1000,
   });
 
   if (isLoading) {

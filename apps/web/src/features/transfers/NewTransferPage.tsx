@@ -15,7 +15,11 @@ interface SelectedItem {
 export function NewTransferPage() {
   const navigate = useNavigate();
 
-  const { data: userResponse } = useQuery<any>({ queryKey: ["me"], queryFn: getMe });
+  const { data: userResponse } = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    staleTime: 5 * 60 * 1000,
+  });
   const user = userResponse?.user;
   const isOwner = user?.role === "OWNER";
 
@@ -48,9 +52,10 @@ export function NewTransferPage() {
   }, [user, isOwner, transferDirection]);
 
   // Fetch balances for source branch to show real-time stock
-  const { data: sourceBalancesData } = useInventoryBalances({
-    branchId: sourceBranchId || undefined,
-  });
+  const { data: sourceBalancesData } = useInventoryBalances(
+    { branchId: sourceBranchId || undefined },
+    { enabled: Boolean(sourceBranchId) }
+  );
 
   const sourceStockMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -229,7 +234,7 @@ export function NewTransferPage() {
                   checked={transferDirection === "OUTBOUND"}
                   onChange={() => {
                     setTransferDirection("OUTBOUND");
-                    setSourceBranchId(user.branchId);
+                    setSourceBranchId(user?.branchId || "");
                     setDestinationBranchId("");
                     setValidationError(null);
                   }}
@@ -244,7 +249,7 @@ export function NewTransferPage() {
                   checked={transferDirection === "INBOUND"}
                   onChange={() => {
                     setTransferDirection("INBOUND");
-                    setDestinationBranchId(user.branchId);
+                    setDestinationBranchId(user?.branchId || "");
                     setSourceBranchId("");
                     setValidationError(null);
                   }}

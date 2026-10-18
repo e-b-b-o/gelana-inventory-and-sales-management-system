@@ -26,7 +26,10 @@ export function Login() {
 
   const mutation = useMutation({
     mutationFn: login,
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      if (data?.user) {
+        queryClient.setQueryData(["me"], { user: data.user });
+      }
       queryClient.invalidateQueries({ queryKey: ["me"] });
     },
   });
