@@ -343,7 +343,7 @@ export function CurrentClosingPage() {
 
             {/* Lifecycle Progress Indicator */}
             <div className="mb-5 bg-surface-container-low p-3.5 rounded-lg border border-outline-variant">
-              <div className="flex items-center justify-between text-label-sm font-label-sm text-outline mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 text-label-sm font-label-sm text-outline mb-2">
                 <span className={`flex items-center gap-1 ${closing?.status === "NOT_SUBMITTED" ? "text-primary font-bold" : "text-emerald-700 font-semibold"}`}>
                   <span className="material-symbols-outlined text-[16px]">
                     {closing?.status === "NOT_SUBMITTED" ? "radio_button_checked" : "check_circle"}
@@ -657,17 +657,6 @@ export function CurrentClosingPage() {
                     <span className="text-label-sm text-emerald-700 font-semibold">Passed</span>
                   </div>
                   <p className="text-body-sm text-outline mt-0.5">{checks?.allSalesRecorded?.message}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-2.5 bg-surface rounded-lg border border-outline-variant">
-                <span className="material-symbols-outlined text-emerald-600 mt-0.5">cloud_done</span>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-label-md text-on-surface font-semibold">Required Sync Completed</p>
-                    <span className="text-label-sm text-emerald-700 font-semibold">Passed</span>
-                  </div>
-                  <p className="text-body-sm text-outline mt-0.5">{checks?.requiredSyncCompleted?.message}</p>
                 </div>
               </div>
 

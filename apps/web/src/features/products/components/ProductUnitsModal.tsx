@@ -153,7 +153,7 @@ export function ProductUnitsModal({ isOpen, onClose, product }: ProductUnitsModa
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-card border border-neutral-200/60 w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div>
             <h2 className="text-xl font-bold text-dark-slate">Units: {product.name}</h2>
             <p className="text-sm text-slate-500 font-medium">SKU: {product.sku}</p>
@@ -168,7 +168,7 @@ export function ProductUnitsModal({ isOpen, onClose, product }: ProductUnitsModa
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto">
+        <div className="p-4 sm:p-6 overflow-y-auto">
           {error && (
             <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium">
               {error}
@@ -179,7 +179,7 @@ export function ProductUnitsModal({ isOpen, onClose, product }: ProductUnitsModa
             <div className="text-center py-8 text-slate-500 text-sm font-medium">Loading units...</div>
           ) : (
             <div className="space-y-6">
-              <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+              <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-200">

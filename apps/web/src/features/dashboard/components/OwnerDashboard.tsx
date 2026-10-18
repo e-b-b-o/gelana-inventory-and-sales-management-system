@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useOwnerDashboard } from "../api/dashboardApi";
-import { useQuery } from "@tanstack/react-query";
-import { fetchApi } from "../../../lib/api";
+import { useBranches } from "../../branches/api";
 
 export function OwnerDashboard() {
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
@@ -10,13 +9,7 @@ export function OwnerDashboard() {
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
 
   // Fetch branches for filter dropdown
-  const { data: branchesData } = useQuery({
-    queryKey: ["branches"],
-    queryFn: async () => {
-      const res = await fetchApi("/branches");
-      return res.data;
-    },
-  });
+  const { data: branchesData = [] } = useBranches();
 
   const { data, isLoading, isError, error, refetch } = useOwnerDashboard({
     branchId: selectedBranchId || undefined,
@@ -126,7 +119,7 @@ export function OwnerDashboard() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {/* Critical Discrepancy Card */}
           <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200 flex flex-col justify-between">
             <div>
@@ -272,19 +265,19 @@ export function OwnerDashboard() {
       </section>
 
       {/* 3. Level 2: Top KPI Metrics (Strictly 4 Operational Cards) */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5" aria-label="KPI overview">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5" aria-label="KPI overview">
         {/* Metric 1: Today's Recorded Sales */}
-        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200">
+        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-4 sm:p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-label-md font-label-md uppercase tracking-wider text-outline font-semibold">
               Today's Recorded Sales
             </span>
-            <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200/70">
+            <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200/70 shrink-0">
               <span className="material-symbols-outlined text-lg">trending_up</span>
             </span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-headline-xl font-headline-xl text-on-surface tracking-tight font-mono font-bold">
+          <div className="mt-3 flex items-baseline gap-2 flex-wrap min-w-0">
+            <span className="text-2xl sm:text-headline-xl font-bold tracking-tight font-mono text-on-surface break-words min-w-0">
               {kpis.todaySales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             <span className="text-label-sm font-label-sm text-on-surface-variant font-medium">ETB</span>
@@ -298,17 +291,17 @@ export function OwnerDashboard() {
         </div>
 
         {/* Metric 2: Current Inventory Valuation */}
-        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200">
+        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-4 sm:p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-label-md font-label-md uppercase tracking-wider text-outline font-semibold">
               Inventory Valuation
             </span>
-            <span className="w-9 h-9 rounded-xl bg-primary-fixed text-primary flex items-center justify-center border border-primary/20">
+            <span className="w-9 h-9 rounded-xl bg-primary-fixed text-primary flex items-center justify-center border border-primary/20 shrink-0">
               <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
             </span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-headline-xl font-headline-xl text-on-surface tracking-tight font-mono font-bold">
+          <div className="mt-3 flex items-baseline gap-2 flex-wrap min-w-0">
+            <span className="text-2xl sm:text-headline-xl font-bold tracking-tight font-mono text-on-surface break-words min-w-0">
               {kpis.inventoryValuation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             <span className="text-label-sm font-label-sm text-on-surface-variant font-medium">ETB</span>
@@ -320,17 +313,17 @@ export function OwnerDashboard() {
         </div>
 
         {/* Metric 3: Low Stock Items */}
-        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200">
+        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-4 sm:p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-label-md font-label-md uppercase tracking-wider text-outline font-semibold">
               Low Stock Items
             </span>
-            <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200/70">
+            <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200/70 shrink-0">
               <span className="material-symbols-outlined text-lg">warning</span>
             </span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-headline-xl font-headline-xl text-on-surface tracking-tight font-bold font-mono">
+          <div className="mt-3 flex items-baseline gap-2 flex-wrap min-w-0">
+            <span className="text-2xl sm:text-headline-xl font-bold tracking-tight font-mono text-on-surface break-words min-w-0">
               {kpis.lowStockCount}
             </span>
             <span className="text-label-sm font-label-sm text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80">
@@ -346,17 +339,17 @@ export function OwnerDashboard() {
         </div>
 
         {/* Metric 4: Out of Stock */}
-        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200">
+        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-4 sm:p-5 shadow-bento hover:shadow-bento-hover transition-all duration-200">
           <div className="flex items-center justify-between">
             <span className="text-label-md font-label-md uppercase tracking-wider text-outline font-semibold">
               Out of Stock
             </span>
-            <span className="w-9 h-9 rounded-xl bg-red-50 text-red-700 flex items-center justify-center border border-red-200/70">
+            <span className="w-9 h-9 rounded-xl bg-red-50 text-red-700 flex items-center justify-center border border-red-200/70 shrink-0">
               <span className="material-symbols-outlined text-lg">error_outline</span>
             </span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-headline-xl font-headline-xl text-red-600 tracking-tight font-bold font-mono">
+          <div className="mt-3 flex items-baseline gap-2 flex-wrap min-w-0">
+            <span className="text-2xl sm:text-headline-xl font-bold tracking-tight font-mono text-red-600 break-words min-w-0">
               {kpis.outOfStockCount}
             </span>
             <span className="text-label-sm font-label-sm text-red-700 font-semibold bg-red-50 px-2 py-0.5 rounded-full border border-red-200/80">
@@ -498,14 +491,14 @@ export function OwnerDashboard() {
       {/* 5. Level 4: Two-Column Operations Layout (Sales Trend + Recent Business Activity) */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column (7/12): Sales Trend Chart */}
-        <div className="lg:col-span-7 bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-6 shadow-bento flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-4 sm:p-6 shadow-bento flex flex-col justify-between">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-outline-variant/60">
               <div>
                 <h3 className="text-headline-sm font-headline-sm text-on-surface font-bold">Sales Trend</h3>
                 <p className="text-body-sm font-body-sm text-on-surface-variant">Sales volume trend across branches</p>
               </div>
-              <div className="flex items-center gap-1.5 text-xs">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <button
                   type="button"
                   onClick={() => setTrendRange("today")}
@@ -622,7 +615,7 @@ export function OwnerDashboard() {
         </div>
 
         {/* Right Column (5/12): Recent Business Activity Log */}
-        <div className="lg:col-span-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-6 shadow-bento flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-4 sm:p-6 shadow-bento flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-outline-variant">
               <div>

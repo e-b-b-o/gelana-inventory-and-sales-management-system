@@ -25,7 +25,11 @@ type SelectedReturnItem = {
 
 export function NewReturnPage() {
   const navigate = useNavigate();
-  const { data: userResponse } = useQuery<any>({ queryKey: ["me"], queryFn: getMe });
+  const { data: userResponse } = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    staleTime: 5 * 60 * 1000,
+  });
   const user = userResponse?.user;
   const isOwner = user?.role === "OWNER";
 
@@ -43,9 +47,10 @@ export function NewReturnPage() {
 
   // Unlinked Return State
   const [unlinkedBranchId, setUnlinkedBranchId] = useState("");
-  const { data: inventoryData } = useInventoryBalances({
-    branchId: unlinkedBranchId || undefined,
-  });
+  const { data: inventoryData } = useInventoryBalances(
+    { branchId: unlinkedBranchId || undefined },
+    { enabled: returnMode === "unlinked" && Boolean(unlinkedBranchId) }
+  );
   const products = inventoryData?.data || [];
 
   const [unlinkedSelectedProductId, setUnlinkedSelectedProductId] = useState("");
@@ -286,7 +291,7 @@ export function NewReturnPage() {
       )}
 
       {/* RETURN MODE TABS */}
-      <div className="bg-white border border-slate-200 rounded-xl p-1.5 inline-flex gap-1 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl p-1.5 flex flex-col sm:inline-flex sm:flex-row gap-1 shadow-sm w-full sm:w-auto">
         <button
           type="button"
           onClick={() => {

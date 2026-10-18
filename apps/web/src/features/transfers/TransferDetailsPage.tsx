@@ -539,7 +539,7 @@ export function TransferDetailsPage() {
       {/* 3. HORIZONTAL LIFECYCLE PROGRESS STEPPER */}
       <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Transfer Progress</h2>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Step 1: Requested */}
           <div className="flex flex-col bg-slate-50 p-3 rounded-lg border border-slate-200">
             <div className="flex items-center justify-between mb-2">

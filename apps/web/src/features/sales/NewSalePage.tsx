@@ -1,24 +1,18 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { fetchApi } from "../../lib/api";
+import { useQuery } from "@tanstack/react-query";
 import { useCreateSale } from "./api";
 import { useBranches } from "../branches/api";
 import { getMe } from "../auth/api/auth";
 import { useInventoryBalances } from "../inventory/api";
-
-const usePaymentMethods = () => {
-  return useQuery({
-    queryKey: ["paymentMethods"],
-    queryFn: async () => {
-      const res = await fetchApi("/payment-methods");
-      return res.filter((pm: any) => pm.isActive);
-    },
-  });
-};
+import { usePaymentMethods } from "../payment-methods/api";
 
 export const NewSalePage = () => {
-  const { data: userResponse } = useQuery<any>({ queryKey: ["me"], queryFn: getMe });
+  const { data: userResponse } = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    staleTime: 5 * 60 * 1000,
+  });
   const isOwner = userResponse?.user?.role === "OWNER";
   const userBranchId = userResponse?.user?.branchId;
 
@@ -34,11 +28,14 @@ export const NewSalePage = () => {
 
   const activeBranchId = isOwner ? selectedBranchId : userBranchId || "";
 
-  const { data: inventoryData, isLoading: isInventoryLoading } = useInventoryBalances({
-    branchId: activeBranchId || undefined,
-  });
+  const isInventoryReady = Boolean(activeBranchId);
+  const { data: inventoryData, isLoading: isInventoryLoading } = useInventoryBalances(
+    { branchId: activeBranchId || undefined },
+    { enabled: isInventoryReady }
+  );
   const inventory = inventoryData?.data;
-  const { data: paymentMethods } = usePaymentMethods();
+  const { data: rawPaymentMethods = [] } = usePaymentMethods();
+  const paymentMethods = useMemo(() => rawPaymentMethods.filter((pm: any) => pm.isActive), [rawPaymentMethods]);
   const createSale = useCreateSale();
 
   const [cart, setCart] = useState<any[]>([]);
@@ -259,11 +256,11 @@ export const NewSalePage = () => {
       </div>
 
       {/* MAIN TWO-COLUMN WORKFLOW */}
-      <div className="flex-1 flex overflow-hidden gap-6 min-h-0">
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
         {/* LEFT: Product Catalog & Selection */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex-1 flex flex-col min-h-[360px] lg:min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm">
           {/* Catalog Toolbar */}
-          <div className="p-4 border-b border-slate-200 flex flex-wrap items-center gap-3 bg-slate-50">
+          <div className="p-3 sm:p-4 border-b border-slate-200 flex flex-wrap items-center gap-3 bg-slate-50">
             {isOwner && (
               <div className="w-full sm:w-56">
                 <select
@@ -283,7 +280,7 @@ export const NewSalePage = () => {
               </div>
             )}
 
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[180px]">
               <svg
                 className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none"
                 fill="none"
@@ -303,7 +300,7 @@ export const NewSalePage = () => {
           </div>
 
           {/* Product Grid */}
-          <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 max-h-[45vh] lg:max-h-none">
             {isInventoryLoading ? (
               <div className="col-span-full py-12 text-center text-slate-500">
                 <div className="flex justify-center items-center">
@@ -343,7 +340,7 @@ export const NewSalePage = () => {
         </div>
 
         {/* RIGHT: Cart & Checkout Panel */}
-        <div className="w-[420px] flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm shrink-0 overflow-hidden">
+        <div className="w-full lg:w-[400px] xl:w-[420px] flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm shrink-0">
           {/* Cart Header */}
           <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
             <div className="flex items-center gap-2">

@@ -3,26 +3,21 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateOpeningStockInputSchema, type CreateOpeningStockInput } from "../api/schema";
 import { useCreateOpeningStock } from "../api";
-import { useQuery } from "@tanstack/react-query";
-import { fetchApi } from "../../../lib/api";
+import { useBranches } from "../../branches/api";
+import { useProducts } from "../../products/api";
 
 type OpeningStockModalProps = {
   isOpen: boolean;
   onClose: () => void;
 };
 
-// Simplified schemas to fetch options
-import { useBranches } from "../../branches/api";
-const fetchProducts = async () => fetchApi("/products");
-
 export function OpeningStockModal({ isOpen, onClose }: OpeningStockModalProps) {
   const { mutateAsync: createOpeningStock, isPending } = useCreateOpeningStock();
   const [errorMsg, setErrorMsg] = useState("");
 
-  const { data: branches } = useBranches();
-
-  const { data: productsResponse } = useQuery({ queryKey: ["products"], queryFn: fetchProducts });
-  const products = Array.isArray(productsResponse) ? productsResponse : productsResponse?.data || [];
+  const { data: branches } = useBranches({ enabled: isOpen });
+  const { data: productsData } = useProducts({ enabled: isOpen });
+  const products = Array.isArray(productsData) ? productsData : (productsData as any)?.data || [];
 
   const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<CreateOpeningStockInput>({
     resolver: zodResolver(CreateOpeningStockInputSchema),
@@ -146,18 +141,18 @@ export function OpeningStockModal({ isOpen, onClose }: OpeningStockModalProps) {
 
           </div>
 
-          <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100">
+          <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 sm:gap-3 pt-4 border-t border-slate-100">
             <button 
               type="button" 
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              className="px-4 py-2.5 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors text-center"
               disabled={isPending}
             >
               Cancel
             </button>
             <button 
               type="submit" 
-              className="px-4 py-2 rounded-lg text-sm font-bold bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2.5 rounded-lg text-sm font-bold bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               disabled={isPending}
             >
               {isPending && <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="31.4 31.4" className="opacity-20"></circle><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round"></path></svg>}

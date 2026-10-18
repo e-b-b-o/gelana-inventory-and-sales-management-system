@@ -21,7 +21,7 @@ export function ReceivingDetailsDrawer({ receivingId, onClose }: Props) {
       
       {/* Drawer */}
       <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-surface-container-lowest shadow-2xl z-50 flex flex-col border-l border-outline-variant transform transition-transform duration-300">
-        <div className="flex items-center justify-between px-space-lg py-space-md border-b border-outline-variant bg-white">
+        <div className="flex items-center justify-between px-4 sm:px-space-lg py-space-md border-b border-outline-variant bg-white">
           <div>
             <h2 className="text-headline-sm font-headline-sm text-on-surface">Receiving Details</h2>
             <p className="text-body-sm font-body-sm text-on-surface-variant mt-1">
@@ -36,7 +36,7 @@ export function ReceivingDetailsDrawer({ receivingId, onClose }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-space-lg">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-space-lg">
           {isLoading && (
             <div className="flex justify-center items-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -52,7 +52,7 @@ export function ReceivingDetailsDrawer({ receivingId, onClose }: Props) {
           {receiving && !isLoading && !isError && (
             <div className="space-y-space-lg">
               {/* Header Info */}
-              <div className="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200">
                 <div>
                   <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date Received</span>
                   <span className="text-body-md font-medium text-dark-slate">
@@ -94,7 +94,7 @@ export function ReceivingDetailsDrawer({ receivingId, onClose }: Props) {
               {/* Items Table */}
               <div>
                 <h3 className="text-title-md font-title-md text-on-surface mb-4">Received Items</h3>
-                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">

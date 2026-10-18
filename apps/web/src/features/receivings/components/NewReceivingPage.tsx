@@ -11,12 +11,17 @@ import { useProducts } from '../../products/api';
 import { useNavigate } from 'react-router-dom';
 
 export function NewReceivingPage() {
-  const { data: userResponse } = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { data: userResponse } = useQuery({
+    queryKey: ['me'],
+    queryFn: getMe,
+    staleTime: 5 * 60 * 1000,
+  });
   const user = userResponse?.user;
+  const isOwner = user?.role === 'OWNER';
   const navigate = useNavigate();
-  const { data: branchesData } = useBranches();
-  const { data: suppliersData } = useSuppliers();
-  const { data: productsData } = useProducts();
+  const { data: branchesData } = useBranches({ enabled: isOwner });
+  const { data: suppliersData } = useSuppliers({ enabled: isOwner });
+  const { data: productsData } = useProducts({ enabled: isOwner });
 
   const branches = branchesData || [];
   const suppliers = suppliersData || [];
@@ -230,7 +235,7 @@ export function NewReceivingPage() {
               <span className="w-6 h-6 rounded-full bg-primary-fixed text-primary font-bold text-xs flex items-center justify-center">2</span>
               <h2 className="text-headline-sm font-headline-sm text-on-surface">Product Intake</h2>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[20px]">search</span>
                 <select
