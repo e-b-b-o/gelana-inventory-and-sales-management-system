@@ -156,7 +156,7 @@ export class InventoryService {
         balance = newBalance;
       }
 
-      const { movementType, quantity, unitCost, isOfflineSync } = params;
+      const { movementType, quantity, unitCost } = params;
 
       let newAvailable = balance.availableQuantity;
       let newDamaged = balance.damagedQuantity;
@@ -187,17 +187,15 @@ export class InventoryService {
           break;
       }
 
-      // 3. Negative inventory constraint
-      if (!isOfflineSync) {
-        if (newAvailable < 0) {
-          throw new AppError("Insufficient available inventory", 400);
-        }
-        if (newDamaged < 0) {
-          throw new AppError("Insufficient damaged inventory", 400);
-        }
-        if (newInTransit < 0) {
-          throw new AppError("Insufficient in-transit inventory", 400);
-        }
+      // 3. Negative inventory constraint (strictly enforced: no negative stock in online-only architecture)
+      if (newAvailable < 0) {
+        throw new AppError("Insufficient available inventory", 400);
+      }
+      if (newDamaged < 0) {
+        throw new AppError("Insufficient damaged inventory", 400);
+      }
+      if (newInTransit < 0) {
+        throw new AppError("Insufficient in-transit inventory", 400);
       }
 
       // 4. Update WAC

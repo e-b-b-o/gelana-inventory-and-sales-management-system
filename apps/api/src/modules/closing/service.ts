@@ -45,9 +45,9 @@ export class ClosingService {
   /**
    * Authoritatively calculate totals and payment breakdown from completed sales and returns.
    */
-  static async calculateClosingTotals(branchId: string, dateStr: string, tx: any = db) {
-    // 1. Fetch all active payment methods
-    const activePaymentMethods = await tx.select().from(paymentMethods).where(eq(paymentMethods.isActive, true));
+  static async calculateClosingTotals(branchId: string, dateStr: string, tx: any = db, preloadedPaymentMethods?: any[]) {
+    // 1. Fetch all active payment methods or reuse preloaded
+    const activePaymentMethods = preloadedPaymentMethods || await tx.select().from(paymentMethods).where(eq(paymentMethods.isActive, true));
 
     // 2. Fetch completed sales for this branch and date
     const completedSales = await tx.query.sales.findMany({
@@ -254,17 +254,16 @@ export class ClosingService {
         : `Previous Day: ${previousDateStr} closing has not been submitted. (Note: An open previous day does not block today's operations).`,
     };
 
+    // Preload active payment methods once for closing calculations
+    const activePaymentMethods = await db.select().from(paymentMethods).where(eq(paymentMethods.isActive, true));
+
     // Calculate live authoritative totals
-    const liveCalculations = await this.calculateClosingTotals(targetBranchId, dateStr);
+    const liveCalculations = await this.calculateClosingTotals(targetBranchId, dateStr, db, activePaymentMethods);
 
     const checks = {
       allSalesRecorded: {
         passed: true,
         message: `${liveCalculations.salesCount} of ${liveCalculations.salesCount} sales entered for this business day. No pending draft sales.`,
-      },
-      requiredSyncCompleted: {
-        passed: true,
-        message: "Online — All synced. All local branch records synchronized with system.",
       },
       previousDayStatus,
     };
@@ -298,8 +297,10 @@ export class ClosingService {
               reviewedAt: c.reviewedAt,
             };
           } else {
-            // Live totals for unsubmitted branch
-            const live = await this.calculateClosingTotals(b.id, dateStr);
+            // Live totals for unsubmitted branch - reuse target branch calculation if matching
+            const live = (b.id === targetBranchId)
+              ? liveCalculations
+              : await this.calculateClosingTotals(b.id, dateStr, db, activePaymentMethods);
             return {
               branchId: b.id,
               branchName: b.name,

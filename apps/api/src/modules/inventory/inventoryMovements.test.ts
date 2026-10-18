@@ -145,21 +145,17 @@ describe("Inventory Movements (recordMovement)", () => {
     ).rejects.toThrow("Insufficient available inventory");
   });
 
-  it("should allow negative inventory for offline sync operations", async () => {
-    await InventoryService.recordMovement({
-      branchId: testBranchId,
-      productId: testProductId,
-      movementType: "SALE",
-      quantity: -20,
-      unitCost: 10,
-      createdById: testUserId,
-      isOfflineSync: true, // This flag bypasses constraint
-    });
-
-    const balances = await db.select().from(inventoryBalances)
-      .where(eq(inventoryBalances.productId, testProductId));
-    
-    expect(balances[0]!.availableQuantity).toBe(-20);
+  it("should strictly reject negative inventory with no offline sync bypasses", async () => {
+    await expect(
+      InventoryService.recordMovement({
+        branchId: testBranchId,
+        productId: testProductId,
+        movementType: "SALE",
+        quantity: -20,
+        unitCost: 10,
+        createdById: testUserId,
+      })
+    ).rejects.toThrow("Insufficient available inventory");
   });
 
   it("should maintain branch isolation for balances and WAC", async () => {

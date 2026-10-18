@@ -161,7 +161,7 @@ describe("Milestone 9 — Daily Closing Service (Slices 9.1 – 9.4)", () => {
       expect(res.closing.branchId).toBe(branchAId);
       expect(res.closing.status).toBe("NOT_SUBMITTED");
       expect(res.checks.allSalesRecorded.passed).toBe(true);
-      expect(res.checks.requiredSyncCompleted.passed).toBe(true);
+      expect(res.checks.previousDayStatus).toBeDefined();
 
       // Attempting to access Branch B as Employee A must fail with 403 Forbidden
       await expect(

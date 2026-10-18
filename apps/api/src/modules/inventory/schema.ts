@@ -36,7 +36,6 @@ export type RecordMovementParams = {
   referenceId?: string;
   reason?: string;
   createdById: string;
-  isOfflineSync?: boolean;
   dbTx?: any; // To allow running inside an external transaction if needed
 };
 
