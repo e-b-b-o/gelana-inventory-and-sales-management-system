@@ -124,8 +124,13 @@ export function SettingsPage() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setPasswordErrorMsg("New password must be at least 8 characters long.");
+    if (newPassword.trim().length < 6) {
+      setPasswordErrorMsg("New password must be at least 6 characters long and cannot consist solely of whitespace.");
+      return;
+    }
+
+    if (newPassword.length > 128) {
+      setPasswordErrorMsg("New password cannot exceed 128 characters.");
       return;
     }
 
@@ -164,8 +169,10 @@ export function SettingsPage() {
     setRequestErrorMsg("");
 
     if (requestType === "EMAIL_CHANGE") {
-      if (!proposedEmail.trim() || !proposedEmail.includes("@")) {
-        setRequestErrorMsg("Please enter a valid proposed email address.");
+      const trimmedEmail = proposedEmail.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!trimmedEmail || !emailRegex.test(trimmedEmail) || trimmedEmail.length > 255) {
+        setRequestErrorMsg("Please enter a valid proposed email address (max 255 characters).");
         return;
       }
     }
