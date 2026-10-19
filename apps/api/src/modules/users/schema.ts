@@ -1,9 +1,13 @@
 import { z } from "zod";
 
 export const createUserSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().trim().toLowerCase().email("Invalid email format"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name cannot exceed 100 characters"),
+  email: z.string().trim().toLowerCase().max(255, "Email is too long").email("Invalid email format"),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .max(128, "Password cannot exceed 128 characters")
+    .refine((val) => val.trim().length > 0, { message: "Password cannot consist solely of whitespace" }),
   role: z.enum(["OWNER", "EMPLOYEE"]),
   branchId: z.string().uuid("Invalid branch ID").optional().nullable(),
 }).refine(
@@ -20,8 +24,8 @@ export const createUserSchema = z.object({
 );
 
 export const updateUserSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().trim().toLowerCase().email("Invalid email format"),
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name cannot exceed 100 characters"),
+  email: z.string().trim().toLowerCase().max(255, "Email is too long").email("Invalid email format"),
   role: z.enum(["OWNER", "EMPLOYEE"]),
 });
 

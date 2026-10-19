@@ -8,8 +8,12 @@ export const UpdateProfileSchema = z.object({
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 
 export const ChangePasswordSchema = z.object({
-  currentPassword: z.string().min(6, "Current password must be at least 6 characters"),
-  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+  currentPassword: z.string().min(1, "Current password is required").max(128, "Current password is too long"),
+  newPassword: z
+    .string()
+    .min(6, "New password must be at least 6 characters")
+    .max(128, "New password cannot exceed 128 characters")
+    .refine((val) => val.trim().length > 0, { message: "New password cannot consist solely of whitespace" }),
 });
 
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
@@ -17,7 +21,7 @@ export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
 export const CreateAccountRequestSchema = z
   .object({
     type: z.enum(ACCOUNT_REQUEST_TYPES),
-    proposedEmail: z.string().email("Invalid email address").optional(),
+    proposedEmail: z.string().trim().toLowerCase().max(255, "Email is too long").email("Invalid email address").optional(),
     reason: z.string().max(1000).optional(),
   })
   .superRefine((data, ctx) => {

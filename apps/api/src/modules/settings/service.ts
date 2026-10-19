@@ -400,8 +400,10 @@ export class SettingsService {
       category: "USERS",
       entityType: "account_request",
       entityId: request.id,
-      branchId: requester.branchId || undefined,
-      reason: decisionNotes,
+      reason:
+        request.type === "PASSWORD_RESET" && nextStatus === "COMPLETED"
+          ? "Password reset request approved and temporary credentials issued to user"
+          : decisionNotes,
       metadata: {
         requesterId: requester.id,
         requesterName: requester.name,
