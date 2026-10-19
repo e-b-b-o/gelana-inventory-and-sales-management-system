@@ -10,9 +10,14 @@
     "dev:web": "npm run dev --workspace=@gelana-inventory-and-sales-management-system/web",
     "dev:api": "npm run dev --workspace=@gelana-inventory-and-sales-management-system/api",
     "build": "npm run build --workspaces --if-present",
+    "build:api": "npm run build --workspace=@gelana-inventory-and-sales-management-system/api",
+    "build:web": "npm run build --workspace=@gelana-inventory-and-sales-management-system/web",
+    "start:api": "npm run start --workspace=@gelana-inventory-and-sales-management-system/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:migrate": "npm run db:migrate --workspace=@gelana-inventory-and-sales-management-system/api",
+    "seed:demo": "npm run db:seed:demo --workspace=@gelana-inventory-and-sales-management-system/api"
   },
   "devDependencies": {
     "vitest": "^5.0.3"

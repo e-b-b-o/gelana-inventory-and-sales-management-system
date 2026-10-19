@@ -1,4 +1,4 @@
-export const API_URL = "http://localhost:3000/api/v1";
+export const API_URL = import.meta.env?.VITE_API_URL || "/api/v1";
 
 export class ApiError extends Error {
   statusCode: number;
@@ -18,8 +18,15 @@ export class ApiError extends Error {
   }
 }
 
+export function buildApiUrl(endpoint: string): string {
+  const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const base = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
+  return `${base}${normalizedEndpoint}`;
+}
+
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  const url = buildApiUrl(endpoint);
+  const res = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
