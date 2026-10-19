@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, numeric, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, integer, timestamp, numeric, pgEnum, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { branches } from "./branches.js";
 import { products } from "./products.js";
@@ -32,7 +32,12 @@ export const inventoryMovements = pgTable("inventory_movements", {
   reason: varchar("reason", { length: 255 }),
   createdById: uuid("created_by_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("inventory_movements_branch_created_idx").on(table.branchId, table.createdAt),
+  index("inventory_movements_product_created_idx").on(table.productId, table.createdAt),
+  index("inventory_movements_branch_product_created_idx").on(table.branchId, table.productId, table.createdAt),
+  index("inventory_movements_reference_idx").on(table.referenceId),
+]);
 
 export const inventoryMovementsRelations = relations(inventoryMovements, ({ one }) => ({
   branch: one(branches, {

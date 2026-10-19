@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, numeric, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, numeric, integer, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { branches } from "./branches.js";
 import { suppliers } from "./suppliers.js";
@@ -17,7 +17,10 @@ export const receivings = pgTable("receivings", {
   totalCost: numeric("total_cost", { precision: 12, scale: 2 }).notNull(),
   receivedById: uuid("received_by_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("receivings_branch_created_idx").on(table.branchId, table.createdAt),
+  index("receivings_supplier_id_idx").on(table.supplierId),
+]);
 
 export const receivingItems = pgTable("receiving_items", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -25,7 +28,10 @@ export const receivingItems = pgTable("receiving_items", {
   productId: uuid("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull(),
   unitCost: numeric("unit_cost", { precision: 12, scale: 2 }).notNull(),
-});
+}, (table) => [
+  index("receiving_items_receiving_id_idx").on(table.receivingId),
+  index("receiving_items_product_id_idx").on(table.productId),
+]);
 
 export const receivingsRelations = relations(receivings, ({ one, many }) => ({
   branch: one(branches, {

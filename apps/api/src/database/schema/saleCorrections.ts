@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { sales } from "./sales.js";
 import { users } from "./users.js";
@@ -12,7 +12,9 @@ export const saleCorrections = pgTable("sale_corrections", {
   previousState: jsonb("previous_state"),
   newState: jsonb("new_state"),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("sale_corrections_sale_id_idx").on(table.saleId),
+]);
 
 export const saleCorrectionsRelations = relations(saleCorrections, ({ one }) => ({
   sale: one(sales, {

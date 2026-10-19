@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, boolean, timestamp, numeric, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, boolean, timestamp, numeric, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { products } from "./products.js";
 import { productPrices } from "./productPrices.js";
 import { relations } from "drizzle-orm";
@@ -23,7 +23,9 @@ export const productUnitConversions = pgTable("product_unit_conversions", {
   conversionQuantity: numeric("conversion_quantity", { precision: 15, scale: 4 }).notNull(),
   effectiveFrom: timestamp("effective_from", { mode: "string" }).notNull().defaultNow(),
   effectiveUntil: timestamp("effective_until", { mode: "string" }),
-});
+}, (table) => [
+  index("product_unit_conversions_unit_id_idx").on(table.productUnitId),
+]);
 
 export const productUnitsRelations = relations(productUnits, ({ one, many }) => ({
   product: one(products, {

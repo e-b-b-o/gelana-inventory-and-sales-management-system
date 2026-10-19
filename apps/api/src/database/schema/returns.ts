@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, numeric, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, numeric, integer, boolean, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { branches } from "./branches.js";
 import { users } from "./users.js";
@@ -23,7 +23,10 @@ export const salesReturns = pgTable("sales_returns", {
   reason: varchar("reason", { length: 255 }).notNull(),
   isUnlinked: boolean("is_unlinked").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("sales_returns_branch_returned_at_idx").on(table.branchId, table.returnedAt),
+  index("sales_returns_sale_id_idx").on(table.saleId),
+]);
 
 export const salesReturnItems = pgTable("sales_return_items", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -36,7 +39,10 @@ export const salesReturnItems = pgTable("sales_return_items", {
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
   condition: varchar("condition", { length: 20 }).notNull(), // SELLABLE or DAMAGED
   refundAmount: numeric("refund_amount", { precision: 12, scale: 2 }).notNull().default("0"),
-});
+}, (table) => [
+  index("sales_return_items_return_id_idx").on(table.returnId),
+  index("sales_return_items_sale_item_id_idx").on(table.saleItemId),
+]);
 
 export const salesReturnsRelations = relations(salesReturns, ({ one, many }) => ({
   sale: one(sales, {

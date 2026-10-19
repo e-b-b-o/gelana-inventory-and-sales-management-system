@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, numeric, integer, uniqueIndex, pgSequence } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, numeric, integer, uniqueIndex, index, pgSequence } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { branches } from "./branches.js";
 import { users } from "./users.js";
@@ -47,7 +47,9 @@ export const dailyClosingPayments = pgTable("daily_closing_payments", {
   netAmount: numeric("net_amount", { precision: 12, scale: 2 }).notNull().default("0"),
   transactionCount: integer("transaction_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("daily_closing_payments_closing_id_idx").on(table.closingId),
+]);
 
 export const dailyClosingEvents = pgTable("daily_closing_events", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -61,7 +63,9 @@ export const dailyClosingEvents = pgTable("daily_closing_events", {
   notes: varchar("notes", { length: 500 }),
   revision: integer("revision").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("daily_closing_events_closing_id_idx").on(table.closingId),
+]);
 
 export const dailyClosingsRelations = relations(dailyClosings, ({ one, many }) => ({
   branch: one(branches, {

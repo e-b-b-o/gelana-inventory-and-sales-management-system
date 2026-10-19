@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { isNull } from "drizzle-orm";
 import { users } from "./users.js";
 import { branches } from "./branches.js";
@@ -15,5 +15,6 @@ export const branchAssignments = pgTable("branch_assignments", {
 }, (table) => {
   return {
     activeAssignmentIndex: uniqueIndex("active_branch_assignment_idx").on(table.userId).where(isNull(table.endDate)),
+    branchIdIdx: index("branch_assignments_branch_id_idx").on(table.branchId),
   };
 });

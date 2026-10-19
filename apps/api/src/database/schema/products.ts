@@ -1,12 +1,12 @@
 import {
-  numeric,
   pgTable,
   uuid,
   varchar,
   boolean,
   timestamp,
   pgSequence,
-  text
+  text,
+  index
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { categories } from "./categories.js";
@@ -31,7 +31,10 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
     .notNull()
     .defaultNow(),
-});
+}, (table) => [
+  index("products_category_id_idx").on(table.categoryId),
+  index("products_is_active_idx").on(table.isActive),
+]);
 
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;

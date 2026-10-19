@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, numeric, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, numeric, integer, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { branches } from "./branches.js";
 import { users } from "./users.js";
@@ -23,7 +23,12 @@ export const sales = pgTable("sales", {
   grandTotal: numeric("grand_total", { precision: 12, scale: 2 }).notNull().default("0"),
   status: varchar("status", { length: 50 }).notNull().default("COMPLETED"), // COMPLETED, VOIDED
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(), // System entry time
-});
+}, (table) => [
+  index("sales_branch_sold_at_idx").on(table.branchId, table.soldAt),
+  index("sales_created_by_sold_at_idx").on(table.createdById, table.soldAt),
+  index("sales_sold_at_idx").on(table.soldAt),
+  index("sales_status_sold_at_idx").on(table.status, table.soldAt),
+]);
 
 export const saleItems = pgTable("sale_items", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -37,7 +42,10 @@ export const saleItems = pgTable("sale_items", {
   lineDiscount: numeric("line_discount", { precision: 12, scale: 2 }).notNull().default("0"),
   lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(), // (enteredQty * unitPrice) - lineDiscount
   apportionedSaleDiscount: numeric("apportioned_sale_discount", { precision: 12, scale: 2 }).notNull().default("0"), // Allocated portion of sale-level discount
-});
+}, (table) => [
+  index("sale_items_sale_id_idx").on(table.saleId),
+  index("sale_items_product_id_idx").on(table.productId),
+]);
 
 export const salePayments = pgTable("sale_payments", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -45,7 +53,10 @@ export const salePayments = pgTable("sale_payments", {
   paymentMethodId: uuid("payment_method_id").notNull().references(() => paymentMethods.id),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("sale_payments_sale_id_idx").on(table.saleId),
+  index("sale_payments_payment_method_id_idx").on(table.paymentMethodId),
+]);
 
 export const salesRelations = relations(sales, ({ one, many }) => ({
   branch: one(branches, {
