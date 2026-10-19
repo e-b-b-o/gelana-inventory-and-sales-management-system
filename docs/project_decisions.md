@@ -8935,3 +8935,29 @@ To drastically reduce operational risk, eliminate distributed data consistency i
 3. **No Offline Storage or Sync Queues**: No offline queues, client-side transaction caches, or deferred synchronization workers shall be implemented or scheduled. Milestone 12 is intentionally and permanently skipped.
 4. **Milestone Progression**: The intentional skip of Milestone 12 does not block Milestone 13 (Full Verification, now completed) or Milestone 14 (Production Hardening, the subsequent active milestone).
 
+---
+
+## AD-02 — Portfolio Deployment Architecture (Vercel, Render, Neon)
+
+**Status**: Formally Adopted
+
+### Decision
+Gelana's hosted portfolio demonstration uses **Vercel** for the React Vite SPA frontend, **Render** for the Express API service, and **Neon PostgreSQL** for managed serverless database hosting.
+
+### Key Architectural Standards
+1. **Same-Origin API Routing**:
+   - The browser communicates with the frontend's `/api/v1` origin path.
+   - In local development, Vite proxies `/api` to `localhost:3000`.
+   - In production, Vercel rewrites `/api/v1/:path*` to the Render backend service (`https://<render-service-url>/api/v1/:path*`).
+   - Private API cache control (`Cache-Control: no-store, no-cache, must-revalidate`) is strictly enforced at the Vercel edge to prevent CDN caching of sensitive financial data and session cookies.
+2. **First-Party HTTP-Only Cookies**:
+   - Authentication tokens are stored in HTTP-only cookies.
+   - Same-origin proxy routing preserves first-party cookie scope, eliminating cross-site cookie blocking in modern browsers while maintaining fallback support for direct cross-origin calls via `SameSite=None; Secure`.
+3. **Database SSL & Security Boundaries**:
+   - Backend database connections to Neon require TLS with certificate verification enabled (`rejectUnauthorized: true`).
+   - Database connection strings and backend secrets (`JWT_SECRET`, `DATABASE_URL`) are strictly held server-side and never exposed to the frontend bundle or Git repositories.
+4. **Idempotent Portfolio Demo Seeding**:
+   - Seeding demo data into the shared Neon database is non-destructive, strictly idempotent, and guarded in production mode by `ALLOW_DEMO_SEED=true`.
+   - The portfolio demo provides 4 documented public demo testing accounts (`owner@gelana.com`, `downtown@gelana.com`, `employee@gelana.com`, `warehouse@gelana.com`) with hashed passwords (`password123`) for role and branch boundary verification.
+
+

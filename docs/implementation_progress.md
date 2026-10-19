@@ -1683,5 +1683,270 @@ Measured using an automated benchmark suite (`tsx`) against the live PostgreSQL 
 - **Production Build**: `npm run build` passed with **0 errors**, generating clean production bundles.
 
 ### 4. Next Steps
-- **Phase 3**: Conduct deeper database and API query optimization.
+- **Phase 3**: Conduct deeper database and API query optimization. (COMPLETED)
 - **Phase 4**: Perform security hardening and comprehensive regression verification.
+
+---
+
+## Phase 3 — Database & API Optimization
+
+**Status**: Completed
+
+### 1. Objective & Scope
+- **Focus**: Eliminate expensive database queries, add justified indexes derived from actual application query patterns, replace in-memory looping with PostgreSQL aggregations, implement server-side pagination with limit/offset, and guarantee transaction boundaries & concurrency safety across multi-step financial and stock operations.
+- **Strict Boundary**: Preserved React/TypeScript, Node.js/Express, Drizzle ORM, and PostgreSQL architecture. Preserved backend authorization boundaries (hiding purchase cost, WAC, and profit from unauthorized employees), financial immutability, and online-only architecture (Milestone 12 permanently skipped).
+
+### 2. Performance Baseline & Confirmed Bottlenecks
+1. **Unindexed Foreign Key References & Join Sequential Scans**:
+   - PostgreSQL does not create indexes on foreign key referencing columns automatically.
+   - Child tables (`sale_items`, `sale_payments`, `sales_return_items`, `receiving_items`, `daily_closing_payments`, `daily_closing_events`, `product_prices`, `branch_assignments`) suffered sequential scans on parent entity joins.
+2. **Un-sargable Date Expressions**:
+   - `closing/service.ts` queried sales and returns using `sql`(${sales.soldAt})::date = ${dateStr}::date``. Casting timestamps dynamically prevented PostgreSQL from utilizing B-Tree index range scans on `sold_at` and `returned_at`.
+3. **In-Memory Looping and Full Table Scans for Dashboards and Reports**:
+   - `DashboardService.getOwnerDashboard` and `getEmployeeDashboard` queried all completed sales and inventory balance records into Node.js arrays, iterating in JavaScript to compute sums, counts, and valuation.
+   - `ReportsService.getInventoryReport` queried all inventory balances and movements across entire branches into memory, applying category filters, stock status filters, and pagination via JavaScript `.slice()`.
+4. **Concurrency Race Conditions & Deadlock Risks**:
+   - `inventoryBalances` initial record creation lacked conflict guards under parallel operations.
+   - Concurrent multi-item checkouts and transfers locked rows in arbitrary client order, exposing database transactions to potential AB/BA deadlock cycles.
+   - High concurrency checkouts on scarce inventory risked race-condition overselling.
+
+### 3. Solutions Implemented & Architectural Enhancements
+1. **Targeted PostgreSQL Index Architecture (Migration `0021_sloppy_tigra.sql`)**:
+   - Added 29 justified composite, single-column, and foreign key indexes across Drizzle schemas:
+     - `sales`: `sales_branch_sold_at_idx`, `sales_created_by_sold_at_idx`, `sales_sold_at_idx`, `sales_status_sold_at_idx`, `sale_items_sale_id_idx`, `sale_items_product_id_idx`, `sale_payments_sale_id_idx`, `sale_payments_payment_method_id_idx`.
+     - `inventory_movements`: `inventory_movements_branch_created_idx`, `inventory_movements_product_created_idx`, `inventory_movements_branch_product_created_idx`, `inventory_movements_reference_idx`.
+     - `sales_returns`: `sales_returns_branch_returned_at_idx`, `sales_returns_sale_id_idx`, `sales_return_items_return_id_idx`, `sales_return_items_sale_item_id_idx`.
+     - `receivings`: `receivings_branch_created_idx`, `receivings_supplier_id_idx`, `receiving_items_receiving_id_idx`, `receiving_items_product_id_idx`.
+     - `daily_closings`: `daily_closing_payments_closing_id_idx`, `daily_closing_events_closing_id_idx`.
+     - `product_prices`: `product_prices_product_unit_id_idx`, `product_prices_unit_effective_idx`.
+     - `sale_corrections`: `sale_corrections_sale_id_idx`.
+     - `products`: `products_category_id_idx`, `products_is_active_idx`.
+     - `branch_assignments`: `branch_assignments_branch_id_idx`.
+     - `product_unit_conversions`: `product_unit_conversions_unit_id_idx`.
+2. **Sargable Date Range Filters**:
+   - In `apps/api/src/modules/closing/service.ts`, replaced `soldAt::date = date` with index-friendly timestamp boundaries: `gte(soldAt, startOfDay)` and `lte(soldAt, endOfDay)`.
+3. **Database-Side SQL Aggregation**:
+   - In `apps/api/src/modules/dashboard/service.ts`:
+     - Replaced sales in-memory loops with SQL `COALESCE(SUM(grand_total), 0)`, `COUNT(*)::int`, and `GROUP BY branch_id`.
+     - Replaced full inventory balance fetches with SQL `GROUP BY branch_id` aggregating valuation, low-stock counts, and out-of-stock counts.
+     - Employee dashboard queries sales and stock alerts using SQL aggregates and filtered `lte(availableQuantity, minimumStockQuantity)` directly in PostgreSQL.
+4. **Server-Side Pagination & Scoped Aggregation for Reports**:
+   - In `apps/api/src/modules/reports/service.ts`:
+     - `view === "balances"` computes summary KPIs in PostgreSQL, applies category subqueries in SQL, and paginates matching rows with database `limit` and `offset`.
+     - `view === "movements"` computes totals (`totalUnitsAdded`, `totalUnitsDeducted`) in SQL and fetches paginated records via `limit` and `offset`.
+5. **Concurrency Safety & Deadlock Prevention**:
+   - In `apps/api/src/modules/sales/service.ts`: Sorted product IDs deterministically before acquiring row locks (`.for("update")`), completely preventing AB/BA lock cycle deadlocks.
+   - In `apps/api/src/modules/inventory/service.ts`: `recordMovement` performs atomic balance initialization with `.onConflictDoNothing()`, acquires exclusive row locks (`.for("update")`), and enforces non-negative available quantity invariants.
+   - Added automated concurrency tests (`apps/api/src/modules/sales/salesConcurrency.test.ts`) validating 5 parallel checkouts against limited stock and cross-product deadlocks.
+
+### 4. Before-and-After Performance Comparison
+Measurements taken under identical isolated development conditions (5 iterations warm median):
+- `GET /closings/current (Owner)`: **35.66 ms** → **30.58 ms**
+- `GET /reports/inventory (balances)`: **14.28 ms** → **9.75 ms**
+- `GET /reports/inventory (movements)`: **7.15 ms** → **6.73 ms**
+- `GET /sales (limit=20)`: **10.18 ms** → **9.45 ms**
+- `GET /transfers (limit=20)`: **10.00 ms** → **8.52 ms**
+- `GET /notifications`: **6.94 ms** → **5.85 ms**
+- `GET /audit-logs (limit=20)`: **4.79 ms** → **3.82 ms**
+
+### 5. Quality Check Results
+- **Automated Tests**: **46 test files, 310 / 310 tests passed** (`npm test`). Includes new real-database concurrency tests for overselling and deadlock prevention.
+- **TypeScript Strict Typecheck**: `npm run typecheck` passed with **0 errors** across all workspaces.
+- **Linter**: `npm run lint` passed with **0 errors**.
+- **Production Build**: `npm run build` passed with **0 errors**, generating clean production bundles.
+- **Database Migrations**: Migration `0021_sloppy_tigra.sql` generated and cleanly applied via `npm run db:migrate`. Total 51 active custom indexes verified in PostgreSQL catalog.
+
+### 6. Next Steps
+- **Performance Phase 4**: Comprehensive security audit, permission penetration tests, and regression verification. (COMPLETED)
+
+---
+
+## Phase 4 — Security Audit, Input Validation & Full Regression Verification
+
+**Status**: Completed
+
+### 1. Objective & Scope
+- **Focus**: Thorough security audit and regression verification of the Gelana Inventory & Sales Management System across authentication, authorization, session management, input validation, SQL injection safety, branch isolation, sensitive financial data exposure, error handling, and transaction integrity.
+- **Architectural Invariants Preserved**:
+  - React/TypeScript frontend with vanilla CSS / design tokens.
+  - Node.js/Express with Drizzle ORM and PostgreSQL backend.
+  - Fixed test accounts preserved: `owner@gelana.com`, `downtown@gelana.com`, `employee@gelana.com`, `warehouse@gelana.com` (all with `password123`).
+  - Strict online-only operational model (Milestone 12 permanently skipped per AD-01).
+  - Business calculation integrity: Weighted Average Cost (WAC) formulas and immutable double-entry inventory ledger intact.
+
+### 2. Confirmed Vulnerabilities & Applied Fixes
+1. **Plain-Text Temporary Password Exposure in Audit Log (High Severity)**:
+   - *Vulnerability*: In `apps/api/src/modules/settings/service.ts`, when an Owner approved an employee password reset request, the generated temporary password was appended to `decisionNotes` and passed directly as the `reason` field in `AuditService.recordAudit()`. This permanently stored the cleartext credentials in the immutable `audit_logs` table.
+   - *Fix*: Sanitized `AuditService.recordAudit` in `SettingsService.decideAccountRequest` to log `"Password reset request approved and temporary credentials issued to user"` as the immutable audit reason, preventing cleartext password persistence while still communicating credentials securely via the scoped `account_requests` decision note to the user.
+2. **Unhandled PostgreSQL Unique Constraint Conflicts Causing 500 Server Errors (Medium Severity)**:
+   - *Vulnerability*: In `apps/api/src/middleware/errorHandler.ts`, PostgreSQL uniqueness violations (`err.code === "23505"`, such as duplicate user email or product SKU) were not caught, causing unhandled 500 Internal Server Errors instead of expected validation/conflict responses.
+   - *Fix*: Intercepted PostgreSQL error code `23505` to return a clean `409 Conflict` (`code: "CONFLICT"`) with a safe message, and error code `23503` to return `400 Bad Request` (`code: "FOREIGN_KEY_VIOLATION"`).
+3. **Password Validation & Argon2 Compute Exhaustion / DoS Gaps (Medium Severity)**:
+   - *Vulnerability*: Password validation schemas across `auth`, `users`, and `settings` lacked a maximum length limit (`.max(128)`). An attacker submitting an arbitrary multi-megabyte string could exhaust server CPU during Argon2 hashing. Additionally, passwords containing solely whitespace (e.g. `"      "`) were accepted.
+   - *Fix*: Enforced a standardized password validation policy across both backend Zod schemas and frontend forms: minimum 6 characters (preserving fixed test fixtures), maximum 128 characters, and non-empty whitespace rejection (`.refine(val => val.trim().length > 0)`).
+4. **Email Normalization & Length Bounds (Low Severity)**:
+   - *Vulnerability*: `proposedEmail` in `settings/schema.ts` lacked `.trim()`, `.toLowerCase()`, and `.max(255)`.
+   - *Fix*: Standardized email schema validation across `auth`, `users`, and `settings` to `.trim().toLowerCase().max(255).email()`.
+5. **Employee Cross-Branch Sale Creation Gap (High Severity)**:
+   - *Vulnerability*: While `getSales` and `getSaleById` enforced branch isolation, `SalesService.createSale` lacked a server-side check verifying that an employee's requested `branchId` matched their assigned `branchId`.
+   - *Fix*: Added server-side validation in `SalesService.createSale`: if `!isOwner && user?.branchId && input.branchId !== user.branchId`, the request is immediately rejected with `403 Forbidden` (`AUTHORIZATION_ERROR`).
+6. **Rate Limiter API Contract & Test Lockout Protection (Low Severity)**:
+   - *Vulnerability*: `loginLimiter` returned `{ error: "string" }` instead of the standard Gelana `{ error: { code, message } }` shape and lacked test-environment bypass, risking false-positive 429 lockouts during automated test suites.
+   - *Fix*: Updated `loginLimiter` to return `{ error: { code: "RATE_LIMIT_EXCEEDED", message: "..." } }` and added `skip: () => process.env.NODE_ENV === "test"`.
+
+### 3. Authorization & Branch Isolation Audit
+- **Sales & Returns**:
+  - Employee can only view their own sales and assigned branch sales; cross-branch sales creation is rejected with 403.
+  - Linked returns are scoped to the employee's assigned branch; unlinked returns strictly require `OWNER` authorization.
+  - Unit cost (WAC snapshot) is stripped and nullified for employees in sales details and returns.
+- **Transfers**:
+  - Employee can only request or view transfers where their assigned branch is the source or destination.
+  - Approve, reject, dispatch, and resolve-discrepancy operations strictly require `OWNER`.
+  - Receive transfer is strictly restricted to employees of the destination branch or Owner.
+  - Financial valuation and estimated total cost are stripped for employees.
+- **Daily Closings**:
+  - Employee can only view, check, or submit Daily Closing for their assigned branch.
+  - Submission authoritatively recalculates cash and non-cash totals inside PostgreSQL transaction; cash discrepancy mandatorily requires an explanation.
+  - Approving and rejecting closings strictly require `OWNER`.
+- **Reports & Dashboards**:
+  - Profit report (`/api/v1/reports/profit`) is strictly restricted to `OWNER` (403 for employees).
+  - Sales and inventory reports automatically enforce branch scoping for employees.
+  - In inventory reports, WAC, unit cost, and total inventory valuation are completely nullified (`null`) for employees.
+- **Audit Logs**:
+  - Employees are restricted strictly to audit events for their assigned branch, and sensitive categories (`AUTH`, `USERS`, `SETTINGS`) are excluded.
+
+### 4. Injection, Parameterization & Web Security
+- **SQL Injection**: All database operations use Drizzle ORM query builder and parameterized `sql` template literals. No raw user input is concatenated into SQL text.
+- **Cookie Security**: Authentication JWT token is stored in an `HttpOnly`, `SameSite: "strict"`, and `Secure` (production) cookie. ClearCookie on logout applies the same flags.
+- **User Enumeration**: Failed login with invalid password or non-existent email returns the identical generic message: `"Invalid email or password"`.
+- **Data Privacy**: Passwords and password hashes are never returned in API payloads (`authenticateUser`, `createUser`, `getUsers`, `getMe`).
+
+### 5. Dependency Audit Findings
+- `npm audit --omit=dev` identified 4 moderate/critical vulnerabilities in transitive sub-dependencies:
+  - `proxy-addr` (critical) & `qs` (moderate): transitive dependencies pulled in by `express@5.2.1`.
+  - `morgan` (moderate): HTTP logger.
+  - `ip-address` (moderate): address validation helper.
+- Automated `npm audit fix --force` was evaluated via dry-run and rejected because it proposed removing core build tools (`@tailwindcss/vite`, `tapable`, etc.) and downgrading `drizzle-kit` to `0.18.1`, creating severe breaking changes and build failures.
+- *Recommendation*: Upgrade Express and sub-packages through standard semantic version bumps once Express 5 upstream releases official patch releases for its bundled sub-dependencies.
+
+### 6. Full Regression Verification Results
+- **Automated Tests**: **47 test files, 337 / 337 tests passed** (`npm test`).
+  - Added `apps/api/src/modules/auth/authSecurity.test.ts` with 27 comprehensive security, validation, branch isolation, and error handling tests.
+- **TypeScript Strict Typecheck**: `npm run typecheck` passed with **0 errors** across both API and Web workspaces.
+- **Linter**: `npm run lint` passed with **0 errors** across all workspaces.
+- **Production Build**: `npm run build` passed with **0 errors**, cleanly compiling both API and Web production bundles.
+- **Fixed Test Accounts Verification**: Verified that all four manual test accounts (`owner@gelana.com`, `downtown@gelana.com`, `employee@gelana.com`, `warehouse@gelana.com` with `password123`) authenticate successfully.
+
+---
+
+## Global Search, Product & Category Search, and Complete Demo Data
+
+- **Status**: Completed (Automated & Regression Verified)
+- **Features Implemented**:
+
+### 1. Global Application Search
+- **Backend Architecture (`apps/api/src/modules/search/`)**:
+  - `schema.ts`: Defines `searchQuerySchema` (`q`: 1–100 chars trimmed, `limit`: 1–50, default 10).
+  - `service.ts`: `SearchService.search(query, user, limit)` executes role-aware, branch-isolated search across:
+    - **Navigation & Pages**: 23 supported application destinations. Scoped so Employee never receives administrative/financial routes (`/reports`, `/users/employees`, `/users/branches`, `/receivings`, `/suppliers`, `/payment-methods`, `/audit-logs`, `/settings`).
+    - **Products**: Searches `name`, `sku`, `brand` with relevance ranking (Exact SKU > Exact Name > StartsWith SKU/Name > Partial contains).
+    - **Categories**: Searches category `name`.
+    - **Sales**: Scoped strictly. For Employee: `branchId === user.branchId OR createdById === user.id`. For Owner: all branches. Displays sale number, date, formatted total, and status without leaking cost or WAC.
+    - **Returns**: Scoped strictly to employee's branch. Displays return number, date, refund amount, and reason.
+    - **Transfers**: Scoped strictly to transfers where employee's branch is source or destination. Displays transfer number, status, and creation date.
+    - **Daily Closings**: Scoped strictly to employee's branch. Displays closing number, date, sales count, and approval status.
+  - `controller.ts` & `routes.ts`: Mounted at `/api/v1/search` with `authenticate` middleware.
+  - `search.test.ts`: 9 automated tests verifying query validation, role-based navigation filtering, branch scoping, and search execution.
+- **Frontend Command Dialog (`apps/web/src/features/search/`)**:
+  - `api.ts`: TanStack Query hook `useGlobalSearchQuery(query, enabled)` with debouncing (300ms) and AbortSignal cancellation.
+  - `GlobalSearchDialog.tsx`: Full command palette accessible via `Ctrl+K` or `Cmd+K` global keyboard shortcut or header search trigger.
+    - Arrow Up / Arrow Down keyboard navigation across categorized results.
+    - Enter key navigation directly to authorized records or pages.
+    - Escape key and backdrop dismissal.
+    - Unified UI states: Skeletons during loading, contextual empty state with search suggestions, and error state with retry button.
+  - `Header.tsx`: Integrated responsive search trigger button with `Ctrl K` badge and mounted `GlobalSearchDialog`.
+  - `GlobalSearchDialog.test.tsx`: 6 automated tests verifying rendering, typing, selection, empty state, error state, and Escape dismissal.
+
+### 2. Product & Category Search on Catalog Page
+- **Backend Search Extensions**:
+  - `ProductsService.getProducts(filters)`: Supports optional `search` (name, SKU, brand), `categoryId`, and `isActive` with parameterized `ILIKE` and `exactOptionalPropertyTypes` compliance.
+  - `CategoriesService.getCategories(filters)`: Supports optional `search` and `isActive` with parameterized `ILIKE`.
+- **Frontend Catalog Toolbar (`apps/web/src/features/categories/components/Catalog.tsx`)**:
+  - Dedicated search input with 250ms debouncing and clear button for both Products and Categories views.
+  - Category selector dropdown and Status filter dropdown (All / Active / Inactive).
+  - Main Table:
+    - Unified loading: Spinner and loading rows.
+    - Unified empty: Contextual "No products/categories found matching your search. [Clear filters]".
+    - Unified error: Error banner with "Retry" button.
+  - `Catalog.test.tsx`: 3 automated tests verifying product search, category view switching, and empty states.
+
+### 3. Complete, Safe, and Realistic Demo Data
+- **Implementation (`apps/api/src/database/seeds/demoData.ts` & `runDemoSeed.ts`)**:
+  - **Environment Safety Guard**: Fails closed with an explicit error if `process.env.NODE_ENV === "production"`.
+  - **Multi-Month & Current-Month Coverage**:
+    - Generates 12 realistic sales across August 2026, September 2026, and October 2026 (up to current date: Oct 19, 2026).
+    - Covers Main Branch, Downtown Branch, and Warehouse Branch.
+    - Multi-tender payments: Cash, Telebirr, CBE Bank Transfer, and Card, including split tenders.
+    - Associated immutable `inventory_movements` for every sale line item.
+  - **Returns & Refunds**:
+    - Realistic returns linked to sales: 1 sellable return (cash refund) and 1 damaged return (telebirr refund).
+    - Associated `RETURN_GOOD` and `RETURN_DAMAGED` inventory movements.
+  - **Transfers Across Lifecycle States**:
+    - `COMPLETED`: Warehouse to Main Branch (30 notebooks received).
+    - `DISPATCHED`: Warehouse to Downtown (50 pens in transit with `inTransitQuantity` balance).
+    - `REQUESTED`: Main to Downtown (10 paper reams pending approval).
+    - `DISCREPANCY`: Warehouse to Main (18 markers received, 2 damaged with documented discrepancy reason).
+  - **Daily Closings with Cash Reconciliation**:
+    - 4 realistic approved closings across dates and branches with payment breakdowns matching cash drawer receipts.
+  - **Notifications & Audit Logs**:
+    - Low-stock warning for Downtown branch.
+    - Transfer dispatch notification.
+    - Daily closing approved notification.
+    - Structured audit logs identifying demo actions by Owner and Cashier.
+  - **Strict Idempotency & Non-Destructive Preservation**:
+    - Deterministic UUIDs and sequence numbers (`SAL-DEMO-001`.., `RET-DEMO-001`.., `TRF-DEMO-001`.., `CLS-DEMO-001`..).
+    - Existence checks prevent row duplication on subsequent executions.
+    - Preserves fixed user accounts (`owner@gelana.com`, `downtown@gelana.com`, `employee@gelana.com`, `warehouse@gelana.com` with `password123`) and baseline master data without truncating or deleting records.
+  - **CLI Runner**: Added `npm run seed:demo` (and `npm run db:seed:demo`).
+  - `demoData.test.ts`: 4 automated tests verifying production blocking, multi-month distribution, strict idempotency, and master data preservation.
+
+### 4. Verification Summary
+- **Test Suite**: **51 test files, 359 / 359 tests passed** (`npm test`).
+- **TypeScript**: `npm run typecheck` passed with **0 errors** across all workspaces.
+- **Linter**: `npm run lint` passed with **0 errors** across all workspaces.
+- **Production Build**: `npm run build` passed with **0 errors** for both API and Web bundles.
+- **Local Database Seed**: Verified idempotent execution with `npm run seed:demo`.
+
+## Phase 14 - Production Hardening & Final Portfolio Deployment
+
+**Status**: Completed
+
+### Tasks Completed
+1. **Frontend-to-Backend Architecture & Proxying**:
+   - Updated `apps/web/src/lib/api.ts` to resolve `import.meta.env.VITE_API_URL || "/api/v1"`, enabling same-origin routing locally and in production.
+   - Configured development server proxy in `apps/web/vite.config.ts` (`/api` -> `http://localhost:3000`).
+   - Created `apps/web/vercel.json` and root `vercel.json` with SPA routing (`/((?!api/).*)` -> `/index.html`), API rewrites (`/api/v1/:path*` -> Render backend URL), and edge caching prevention (`Cache-Control: no-store, no-cache, must-revalidate`).
+2. **Backend Production Hardening**:
+   - `apps/api/src/app.ts`: Dynamic CORS origin resolution supporting `process.env.FRONTEND_URL` and `process.env.ALLOWED_ORIGINS` alongside local origins with non-throwing disallow. Enabled `app.set("trust proxy", 1)` for Render reverse proxy support.
+   - `apps/api/src/modules/auth/controller.ts`: Dynamic cookie configuration supporting same-origin proxying (`SameSite=lax`) and cross-origin hosting (`SameSite=none`, `secure: true`) with environment overrides (`COOKIE_SAME_SITE`, `COOKIE_SECURE`).
+   - `apps/api/src/modules/auth/jwt.ts`: Enforced strict validation preventing weak development keys or short secrets in production.
+   - `apps/api/src/config/database.ts`: Enabled SSL with certificate verification (`rejectUnauthorized: true`) for Neon (`neon.tech`) and hosted connections. Exported `pool` for graceful lifecycle management.
+   - `apps/api/src/server.ts`: Bound server to `0.0.0.0` interface. Implemented graceful shutdown on `SIGTERM` and `SIGINT` to safely close HTTP listeners and database connection pools.
+   - `apps/api/src/middleware/errorHandler.ts`: Masked raw database unique constraint detail in production mode to prevent schema or internal value leakage.
+3. **Database Seeding & Portfolio Demo Preparation**:
+   - `apps/api/src/database/seeds/demoData.ts`: Updated safety check to allow deliberate portfolio demo seeding in production when explicitly confirmed via `ALLOW_DEMO_SEED=true`.
+   - `apps/api/src/database/seeds/runDemoSeed.ts`: Integrated non-destructive baseline account and entity verification (`seedDatabase({ reset: false })`) prior to demo data reconciliation, enabling single-command initialization of any fresh or existing Neon database via `npm run seed:demo`.
+   - Confirmed 4 shared demo accounts: `owner@gelana.com`, `downtown@gelana.com`, `employee@gelana.com`, `warehouse@gelana.com` (password: `password123`).
+4. **Environment Templates & Infrastructure As Code**:
+   - Updated `apps/api/.env.example` with comprehensive documentation of all backend environment variables.
+   - Created `apps/web/.env.example` and root `.env.example`.
+   - Created `render.yaml` declarative Blueprint specification for Render Web Service deployment.
+   - Created `apps/web/vercel.json` and root `vercel.json` for Vercel deployment.
+5. **Documentation & Verification**:
+   - Created comprehensive `docs/deployment.md` covering Neon provisioning, Render backend deployment, Vercel frontend deployment, local quickstart, demo access, and hosted acceptance checklist.
+   - Updated `README.md` with portfolio access credentials, system architecture, development commands, and deployment links.
+   - Ran complete automated test suite (51 test files, 359 tests passed).
+   - Verified strict TypeScript builds and oxlint linting across all workspaces.
+
+
+
