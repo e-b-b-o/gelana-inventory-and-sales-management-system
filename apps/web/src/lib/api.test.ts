@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchApi, ApiError } from "./api";
+import { fetchApi, ApiError, buildApiUrl, API_URL } from "./api";
 import { shouldRetry, calculateRetryDelay } from "../app/providers";
 
 describe("API Client & Error Handling", () => {
@@ -13,16 +13,31 @@ describe("API Client & Error Handling", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("returns JSON data on successful response", async () => {
+  it("builds consistent API endpoints with /api/v1 prefix", () => {
+    expect(API_URL).toBe("/api/v1");
+    expect(buildApiUrl("/auth/me")).toBe("/api/v1/auth/me");
+    expect(buildApiUrl("/auth/login")).toBe("/api/v1/auth/login");
+    expect(buildApiUrl("/health")).toBe("/api/v1/health");
+    expect(buildApiUrl("auth/me")).toBe("/api/v1/auth/me");
+  });
+
+  it("returns JSON data on successful response with credentials: include", async () => {
     const mockData = { id: "123", name: "Test" };
-    globalThis.fetch = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue(mockData),
     });
+    globalThis.fetch = fetchMock;
 
     const result = await fetchApi("/test");
     expect(result).toEqual(mockData);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/test",
+      expect.objectContaining({
+        credentials: "include",
+      })
+    );
   });
 
   it("throws ApiError with statusCode 401 for unauthorized requests", async () => {

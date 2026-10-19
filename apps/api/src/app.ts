@@ -40,7 +40,7 @@ const defaultOrigins = [
 
 const envOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || "")
   .split(",")
-  .map((o) => o.trim())
+  .map((o) => o.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 
 const ALLOWED_ORIGINS = Array.from(new Set([...defaultOrigins, ...envOrigins]));
@@ -62,10 +62,17 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, false);
+        return callback(null, true);
       }
+      try {
+        const parsed = new URL(origin);
+        if (parsed.protocol === "https:" && (parsed.hostname.endsWith(".vercel.app") || parsed.hostname === "vercel.app")) {
+          return callback(null, true);
+        }
+      } catch {
+        // ignore invalid URL
+      }
+      return callback(null, false);
     },
     credentials: true,
   }),

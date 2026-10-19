@@ -173,14 +173,18 @@ You can deploy using either the included `render.yaml` Blueprint or manually via
    - **Output Directory:** `dist`
    - **Install Command:** `npm install`
 4. **Configure API Rewrite Destination:**
-   In `apps/web/vercel.json` (and root `vercel.json`), update the rewrite destination with your real Render URL:
+   Both `vercel.json` (repository root) and `apps/web/vercel.json` are pre-configured to forward API requests to the Render backend service:
    ```json
    {
+     "source": "/api/v1",
+     "destination": "https://gelana-inventory-and-sales-management.onrender.com/api/v1"
+   },
+   {
      "source": "/api/v1/:path*",
-     "destination": "https://gelana-api-xxxx.onrender.com/api/v1/:path*"
+     "destination": "https://gelana-inventory-and-sales-management.onrender.com/api/v1/:path*"
    }
    ```
-   Commit and push this change to your repository.
+   Both files ensure that whether Vercel is configured with Root Directory `.` or `apps/web`, all `/api/v1/*` requests (GET, POST, PUT, DELETE) proxy smoothly to Render while SPA routes fall back to `/index.html`. Commit and push to deploy.
 5. Click **Deploy**.
 6. Once deployed, copy your assigned Vercel URL (e.g., `https://gelana-inventory.vercel.app`).
 7. Return to the Render dashboard and update the `FRONTEND_URL` environment variable with this Vercel URL.

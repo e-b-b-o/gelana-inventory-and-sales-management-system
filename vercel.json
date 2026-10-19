@@ -5,8 +5,12 @@
   "outputDirectory": "apps/web/dist",
   "rewrites": [
     {
+      "source": "/api/v1",
+      "destination": "https://gelana-inventory-and-sales-management.onrender.com/api/v1"
+    },
+    {
       "source": "/api/v1/:path*",
-      "destination": "https://YOUR_RENDER_SERVICE_URL.onrender.com/api/v1/:path*"
+      "destination": "https://gelana-inventory-and-sales-management.onrender.com/api/v1/:path*"
     },
     {
       "source": "/((?!api/).*)",
