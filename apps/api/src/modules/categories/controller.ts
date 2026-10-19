@@ -4,8 +4,10 @@ import { getCategories, createCategory, updateCategory, updateCategoryStatus } f
 import { createCategorySchema, updateCategorySchema, updateCategoryStatusSchema } from "./schema.js";
 import { AppError } from "../../utils/errors.js";
 
-export const listCategories = asyncHandler(async (_req: Request, res: Response) => {
-  const allCategories = await getCategories();
+export const listCategories = asyncHandler(async (req: Request, res: Response) => {
+  const search = typeof req.query.search === "string" ? req.query.search.trim() : undefined;
+  const isActive = req.query.isActive !== undefined ? req.query.isActive === "true" : undefined;
+  const allCategories = await getCategories({ search, isActive });
   res.json({ data: allCategories });
 });
 

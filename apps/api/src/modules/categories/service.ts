@@ -1,19 +1,32 @@
-import { eq, desc, ilike } from "drizzle-orm";
+import { eq, desc, ilike, and } from "drizzle-orm";
 import { db } from "../../config/database.js";
 import { categories } from "../../database/schema/index.js";
 import { AppError } from "../../utils/errors.js";
 import { CreateCategoryInput, UpdateCategoryInput, UpdateCategoryStatusInput } from "./schema.js";
 
-export async function getCategories() {
-  return db
+export async function getCategories(filters?: { search?: string | undefined; isActive?: boolean | undefined }) {
+  const conditions = [];
+  if (filters?.search) {
+    conditions.push(ilike(categories.name, `%${filters.search.trim()}%`));
+  }
+  if (filters?.isActive !== undefined) {
+    conditions.push(eq(categories.isActive, filters.isActive));
+  }
+
+  let query = db
     .select({
       id: categories.id,
       name: categories.name,
       isActive: categories.isActive,
       createdAt: categories.createdAt,
     })
-    .from(categories)
-    .orderBy(desc(categories.createdAt));
+    .from(categories);
+
+  if (conditions.length > 0) {
+    query = (query as any).where(and(...conditions));
+  }
+
+  return query.orderBy(desc(categories.createdAt));
 }
 
 export async function createCategory(data: CreateCategoryInput) {

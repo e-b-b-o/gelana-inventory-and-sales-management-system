@@ -6,12 +6,31 @@ import { CreateProductInput, UpdateProductInput, ToggleProductStatusInput } from
 import { sql } from "drizzle-orm";
 
 export class ProductsService {
-  async getProducts() {
+  async getProducts(filters?: { search?: string | undefined; categoryId?: string | undefined; isActive?: boolean | undefined }) {
     const { productUnits } = await import("../../database/schema/productUnits.js");
     const { productPrices } = await import("../../database/schema/productPrices.js");
-    const { eq, isNull, desc } = await import("drizzle-orm");
+    const { eq, and, or, ilike, isNull, desc } = await import("drizzle-orm");
+
+    const whereConditions = [];
+    if (filters?.search) {
+      const searchPattern = `%${filters.search.trim()}%`;
+      whereConditions.push(
+        or(
+          ilike(products.name, searchPattern),
+          ilike(products.sku, searchPattern),
+          ilike(products.brand, searchPattern)
+        )!
+      );
+    }
+    if (filters?.categoryId) {
+      whereConditions.push(eq(products.categoryId, filters.categoryId));
+    }
+    if (filters?.isActive !== undefined) {
+      whereConditions.push(eq(products.isActive, filters.isActive));
+    }
 
     const rows = await db.query.products.findMany({
+      where: whereConditions.length > 0 ? and(...whereConditions) : undefined,
       orderBy: [products.createdAt],
       with: {
         category: true,
@@ -68,7 +87,7 @@ export class ProductsService {
       const seqValue = result.rows[0].nextval;
       const sku = `PRD-${String(seqValue).padStart(6, '0')}`;
 
-      const { defaultSellingPrice, unit, ...productData } = data;
+      const { defaultSellingPrice: _defaultSellingPrice, unit: _unit, ...productData } = data;
       
       const newProduct = {
         ...productData,

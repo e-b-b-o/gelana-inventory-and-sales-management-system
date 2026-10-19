@@ -8,7 +8,10 @@ const productsService = new ProductsService();
 export class ProductsController {
   async getProducts(req: Request, res: Response) {
     try {
-      const products = await productsService.getProducts();
+      const search = typeof req.query.search === "string" ? req.query.search.trim() : undefined;
+      const categoryId = typeof req.query.categoryId === "string" ? req.query.categoryId : undefined;
+      const isActive = req.query.isActive !== undefined ? req.query.isActive === "true" : undefined;
+      const products = await productsService.getProducts({ search, categoryId, isActive });
       res.json(products);
     } catch (error) {
       console.error("[ProductsController.getProducts]", error);
