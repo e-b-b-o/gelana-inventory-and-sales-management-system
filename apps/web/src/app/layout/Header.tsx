@@ -119,9 +119,10 @@ function getBreadcrumbLabel(path: string, index: number, paths: string[], queryC
 interface HeaderProps {
   user: { name?: string; role?: string };
   onOpenMobile?: () => void;
+  onLogout?: () => void;
 }
 
-export function Header({ user, onOpenMobile }: HeaderProps) {
+export function Header({ user, onOpenMobile, onLogout }: HeaderProps) {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -214,7 +215,7 @@ export function Header({ user, onOpenMobile }: HeaderProps) {
         {/* Branch Selector / Indicator */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 bg-surface-container-low rounded border border-outline-variant">
           <span className="material-symbols-outlined text-on-surface-variant text-[18px]">store</span>
-          <span className="text-label-md font-label-md text-on-surface whitespace-nowrap">All Branches</span>
+          <span className="hidden sm:inline text-label-md font-label-md text-on-surface whitespace-nowrap">All Branches</span>
           <span className="hidden sm:inline text-[10px] text-on-surface-variant font-normal">({user?.role === 'OWNER' ? 'Owner view' : 'Employee view'})</span>
         </div>
 
@@ -234,6 +235,22 @@ export function Header({ user, onOpenMobile }: HeaderProps) {
             )}
           </Link>
         </div>
+
+        {/* Header Logout Action */}
+        {onLogout && (
+          <div className="pl-1 sm:pl-2 border-l border-outline-variant">
+            <button
+              type="button"
+              onClick={onLogout}
+              className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 text-on-surface-variant hover:text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer"
+              title="Log out"
+              aria-label="Log out"
+            >
+              <span className="material-symbols-outlined text-[20px]">logout</span>
+              <span className="hidden md:inline text-label-sm font-label-sm font-medium">Log out</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <GlobalSearchDialog

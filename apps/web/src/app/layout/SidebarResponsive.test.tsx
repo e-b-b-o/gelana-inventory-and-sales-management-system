@@ -64,5 +64,13 @@ describe("Sidebar Responsive Behavior", () => {
     expect(closeBtn).toBeDefined();
     fireEvent.click(closeBtn);
     expect(handleCloseMobile).toHaveBeenCalledTimes(1);
+
+    // Logout button in mobile drawer should be present with visible "Log out" text and call logout + onCloseMobile
+    const logoutBtn = screen.getByRole("button", { name: /log out/i });
+    expect(logoutBtn).toBeDefined();
+    expect(logoutBtn.textContent).toContain("Log out");
+    fireEvent.click(logoutBtn);
+    expect(mockLogout.mutate).toHaveBeenCalledTimes(1);
+    expect(handleCloseMobile).toHaveBeenCalledTimes(2);
   });
 });

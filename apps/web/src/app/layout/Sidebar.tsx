@@ -542,7 +542,7 @@ export function Sidebar({
 
       {/* Main Sidebar Element */}
       <aside
-        className={`fixed left-0 top-0 h-screen flex flex-col justify-between bg-surface-container-lowest border-r border-outline-variant/70 shadow-sm z-50 shrink-0 transition-[width,transform] duration-200 ease-in-out w-72 max-w-[85vw] ${
+        className={`fixed left-0 top-0 h-[100dvh] max-h-screen flex flex-col justify-between bg-surface-container-lowest border-r border-outline-variant/70 shadow-sm z-50 shrink-0 transition-[width,transform] duration-200 ease-in-out w-72 max-w-[85vw] ${
           effectiveCollapsed ? "md:w-[72px]" : "md:w-64"
         } ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
@@ -753,7 +753,7 @@ export function Sidebar({
           </nav>
 
           {/* Profile & Logout Footer */}
-          <div className="pt-3 border-t border-outline-variant/60 mt-auto">
+          <div className="pt-3 border-t border-outline-variant/60 mt-auto shrink-0 pb-safe pb-2">
             {effectiveCollapsed ? (
               <div className="flex flex-col items-center gap-2 py-1">
                 <div
@@ -765,17 +765,20 @@ export function Sidebar({
                 </div>
                 <button
                   type="button"
-                  onClick={() => logoutMutation.mutate()}
+                  onClick={() => {
+                    onCloseMobile?.();
+                    logoutMutation.mutate();
+                  }}
                   className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 rounded-lg transition-colors cursor-pointer"
-                  title="Logout"
-                  aria-label="Logout"
+                  title="Log out"
+                  aria-label="Log out"
                 >
                   <span className="material-symbols-outlined text-[18px]">logout</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-between px-2 py-1">
-                <div className="flex items-center gap-3 overflow-hidden">
+              <div className="flex items-center justify-between px-2 py-1 gap-2">
+                <div className="flex items-center gap-3 overflow-hidden min-w-0">
                   <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary text-xs font-bold shrink-0 shadow-xs">
                     {getInitials(user?.name)}
                   </div>
@@ -790,12 +793,16 @@ export function Sidebar({
                 </div>
                 <button
                   type="button"
-                  onClick={() => logoutMutation.mutate()}
-                  className="p-1.5 text-on-surface-variant hover:text-error hover:bg-error-container/40 rounded-lg transition-colors cursor-pointer shrink-0"
-                  title="Logout"
-                  aria-label="Logout"
+                  onClick={() => {
+                    onCloseMobile?.();
+                    logoutMutation.mutate();
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-on-surface-variant hover:text-error hover:bg-error-container/40 rounded-lg transition-colors cursor-pointer shrink-0 border border-transparent hover:border-error/20"
+                  title="Log out"
+                  aria-label="Log out"
                 >
                   <span className="material-symbols-outlined text-[18px]">logout</span>
+                  <span className="text-label-sm font-label-sm font-medium">Log out</span>
                 </button>
               </div>
             )}

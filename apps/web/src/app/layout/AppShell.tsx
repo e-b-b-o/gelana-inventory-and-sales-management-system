@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout } from "../../features/auth/api/auth";
 import { Sidebar } from "./Sidebar";
@@ -10,6 +10,7 @@ const SIDEBAR_COLLAPSED_KEY = "gelana_sidebar_collapsed";
 export function AppShell() {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Collapsed state persisted in localStorage (defaults to false / expanded)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -64,9 +65,10 @@ export function AppShell() {
 
   const logoutMutation = useMutation({
     mutationFn: logout,
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.clear();
       queryClient.setQueryData(["me"], null);
+      navigate("/login", { replace: true });
     },
   });
 
@@ -92,7 +94,11 @@ export function AppShell() {
           isCollapsed ? "md:ml-[72px]" : "md:ml-64"
         } ml-0`}
       >
-        <Header user={user} onOpenMobile={() => setIsMobileOpen(true)} />
+        <Header
+          user={user}
+          onOpenMobile={() => setIsMobileOpen(true)}
+          onLogout={() => logoutMutation.mutate()}
+        />
         <div className="flex-1 overflow-y-auto">
           <main className="p-4 sm:p-6 md:p-margin max-w-7xl w-full mx-auto pb-12">
             <Outlet />
