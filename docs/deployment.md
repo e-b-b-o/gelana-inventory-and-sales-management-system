@@ -145,7 +145,7 @@ You can deploy using either the included `render.yaml` Blueprint or manually via
    - **Branch:** `main`
    - **Root Directory:** `.` (leave at repository root)
    - **Runtime:** `Node`
-   - **Build Command:** `npm ci && npm run build:api`
+   - **Build Command:** `npm ci --include=dev && npm run build:api`
    - **Start Command:** `npm run start:api`
    - **Plan:** `Free`
 4. Under **Advanced**:

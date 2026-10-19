@@ -409,16 +409,7 @@ export async function seedDatabase(options: { reset?: boolean } = { reset: true 
       });
   }
 
-  // Cleanup stray non-seed records if running without truncate
-  if (!options.reset) {
-    const validBranchIds = Object.values(SEED_IDS.branches);
-    const validCategoryIds = Object.values(SEED_IDS.categories);
-    const validProductIds = Object.values(SEED_IDS.products);
 
-    await db.delete(branches).where(sql`id NOT IN (${sql.join(validBranchIds.map(id => sql`${id}`), sql`, `)})`);
-    await db.delete(categories).where(sql`id NOT IN (${sql.join(validCategoryIds.map(id => sql`${id}`), sql`, `)})`);
-    await db.delete(products).where(sql`id NOT IN (${sql.join(validProductIds.map(id => sql`${id}`), sql`, `)})`);
-  }
 
   console.log("Seeding completed successfully!");
   console.log("Canonical Development Dataset Established:");

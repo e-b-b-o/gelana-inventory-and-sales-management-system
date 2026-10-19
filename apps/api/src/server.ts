@@ -16,7 +16,7 @@ const gracefulShutdown = async (signal: string) => {
   isShuttingDown = true;
   console.log(`Received ${signal}. Starting graceful shutdown...`);
 
-  server.close(async (err) => {
+  server.close(async (err?: Error | null) => {
     if (err) {
       console.error("Error during HTTP server close:", err);
       process.exit(1);
