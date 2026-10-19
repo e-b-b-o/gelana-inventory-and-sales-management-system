@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getBalancesQuerySchema, getMovementsQuerySchema, createOpeningStockSchema, createAdjustmentSchema, submitStocktakeSchema, createDisposalSchema } from "./schema.js";
 import { InventoryService } from "./service.js";
-import { authorizeRole } from "../../middleware/authorize.js";
 export class InventoryController {
   static async getBalances(req: Request, res: Response, next: NextFunction) {
     try {

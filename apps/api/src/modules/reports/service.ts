@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, gt, inArray } from "drizzle-orm";
 import { db } from "../../config/database.js";
 import {
   branches,
@@ -10,6 +10,7 @@ import {
   transfers,
   dailyClosings,
   dailyClosingEvents,
+  products,
 } from "../../database/schema/index.js";
 import { AppError } from "../../utils/errors.js";
 import {
@@ -651,9 +652,54 @@ export class ReportsService {
       if (query.productId) {
         balanceConditions.push(eq(inventoryBalances.productId, query.productId));
       }
+      if (query.categoryId) {
+        const catProductSubquery = db
+          .select({ id: products.id })
+          .from(products)
+          .where(eq(products.categoryId, query.categoryId));
+        balanceConditions.push(inArray(inventoryBalances.productId, catProductSubquery));
+      }
 
-      const allBalances = await db.query.inventoryBalances.findMany({
-        where: balanceConditions.length > 0 ? and(...balanceConditions) : undefined,
+      // Compute Authoritative Summary KPIs across matching balances in PostgreSQL
+      const [summary] = await db
+        .select({
+          totalStock: sql<number>`COALESCE(SUM(${inventoryBalances.availableQuantity}), 0)::int`,
+          totalDamaged: sql<number>`COALESCE(SUM(${inventoryBalances.damagedQuantity}), 0)::int`,
+          inTransitTotal: sql<number>`COALESCE(SUM(${inventoryBalances.inTransitQuantity}), 0)::int`,
+          lowStockCount: sql<number>`COUNT(CASE WHEN ${inventoryBalances.availableQuantity} > 0 AND ${inventoryBalances.availableQuantity} <= ${inventoryBalances.minimumStockQuantity} THEN 1 END)::int`,
+          outOfStockCount: sql<number>`COUNT(CASE WHEN ${inventoryBalances.availableQuantity} = 0 THEN 1 END)::int`,
+          totalValuation: isOwner
+            ? sql<string>`COALESCE(SUM(${inventoryBalances.availableQuantity} * ${inventoryBalances.wac}), 0)`
+            : sql<string>`0`,
+        })
+        .from(inventoryBalances)
+        .where(balanceConditions.length > 0 ? and(...balanceConditions) : undefined);
+
+      const recordConditions = [...balanceConditions];
+      if (query.stockStatus === "low") {
+        recordConditions.push(
+          lte(inventoryBalances.availableQuantity, inventoryBalances.minimumStockQuantity),
+          gt(inventoryBalances.availableQuantity, 0)
+        );
+      } else if (query.stockStatus === "out") {
+        recordConditions.push(eq(inventoryBalances.availableQuantity, 0));
+      } else if (query.stockStatus === "in_stock") {
+        recordConditions.push(gt(inventoryBalances.availableQuantity, 0));
+      }
+
+      const [countRow] = await db
+        .select({
+          count: sql<number>`COUNT(*)::int`,
+        })
+        .from(inventoryBalances)
+        .where(recordConditions.length > 0 ? and(...recordConditions) : undefined);
+
+      const totalRecords = Number(countRow?.count || 0);
+      const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
+      const offset = (page - 1) * limit;
+
+      const pageBalances = await db.query.inventoryBalances.findMany({
+        where: recordConditions.length > 0 ? and(...recordConditions) : undefined,
         with: {
           branch: true,
           product: {
@@ -662,49 +708,19 @@ export class ReportsService {
             },
           },
         },
+        orderBy: [
+          sql`CASE 
+            WHEN ${inventoryBalances.availableQuantity} = 0 THEN 0 
+            WHEN ${inventoryBalances.availableQuantity} <= ${inventoryBalances.minimumStockQuantity} THEN 1 
+            ELSE 2 
+          END ASC`,
+        ],
+        limit,
+        offset,
       });
 
-      // Filter category if specified
-      const matchingCategoryBalances = query.categoryId
-        ? allBalances.filter((b) => b.product.categoryId === query.categoryId)
-        : allBalances;
-
-      // Filter stock status if specified
-      let filtered = matchingCategoryBalances;
-      if (query.stockStatus === "low") {
-        filtered = filtered.filter(
-          (b) => b.availableQuantity <= b.minimumStockQuantity && b.availableQuantity > 0
-        );
-      } else if (query.stockStatus === "out") {
-        filtered = filtered.filter((b) => b.availableQuantity === 0);
-      } else if (query.stockStatus === "in_stock") {
-        filtered = filtered.filter((b) => b.availableQuantity > 0);
-      }
-
-      // Compute Authoritative Summary KPIs across matching balances
-      let totalStock = 0;
-      let totalDamaged = 0;
-      let inTransitTotal = 0;
-      let lowStockCount = 0;
-      let outOfStockCount = 0;
-      let totalValuation = 0;
-
-      for (const b of matchingCategoryBalances) {
-        totalStock += b.availableQuantity;
-        totalDamaged += b.damagedQuantity;
-        inTransitTotal += b.inTransitQuantity;
-        if (b.availableQuantity === 0) {
-          outOfStockCount++;
-        } else if (b.availableQuantity <= b.minimumStockQuantity) {
-          lowStockCount++;
-        }
-        if (isOwner) {
-          totalValuation += b.availableQuantity * Number(b.wac);
-        }
-      }
-
       // Map balance items (ensuring Employees NEVER receive WAC or valuation)
-      const mappedItems = filtered.map((b) => ({
+      const mappedItems = pageBalances.map((b) => ({
         id: b.id,
         productId: b.productId,
         productName: b.product.name,
@@ -735,21 +751,17 @@ export class ReportsService {
         return a.productName.localeCompare(b.productName);
       });
 
-      const totalRecords = mappedItems.length;
-      const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
-      const paginatedRecords = mappedItems.slice((page - 1) * limit, page * limit);
-
       return {
         view: "balances" as const,
         summary: {
-          totalStock,
-          totalDamaged,
-          inTransitTotal,
-          lowStockCount,
-          outOfStockCount,
-          totalValuation: isOwner ? Math.round(totalValuation * 100) / 100 : null,
+          totalStock: summary?.totalStock || 0,
+          totalDamaged: summary?.totalDamaged || 0,
+          inTransitTotal: summary?.inTransitTotal || 0,
+          lowStockCount: summary?.lowStockCount || 0,
+          outOfStockCount: summary?.outOfStockCount || 0,
+          totalValuation: isOwner ? Math.round(Number(summary?.totalValuation || 0) * 100) / 100 : null,
         },
-        records: paginatedRecords,
+        records: mappedItems,
         pagination: {
           page,
           limit,
@@ -781,8 +793,29 @@ export class ReportsService {
       if (query.movementType) {
         movementConditions.push(eq(inventoryMovements.movementType, query.movementType));
       }
+      if (query.categoryId) {
+        const catProductSubquery = db
+          .select({ id: products.id })
+          .from(products)
+          .where(eq(products.categoryId, query.categoryId));
+        movementConditions.push(inArray(inventoryMovements.productId, catProductSubquery));
+      }
 
-      const allMovements = await db.query.inventoryMovements.findMany({
+      // Compute summary in PostgreSQL
+      const [movementSummary] = await db
+        .select({
+          totalRecords: sql<number>`COUNT(*)::int`,
+          totalAdded: sql<number>`COALESCE(SUM(CASE WHEN ${inventoryMovements.quantity} > 0 THEN ${inventoryMovements.quantity} ELSE 0 END), 0)::int`,
+          totalDeducted: sql<number>`COALESCE(SUM(CASE WHEN ${inventoryMovements.quantity} < 0 THEN ABS(${inventoryMovements.quantity}) ELSE 0 END), 0)::int`,
+        })
+        .from(inventoryMovements)
+        .where(and(...movementConditions));
+
+      const totalRecords = movementSummary?.totalRecords || 0;
+      const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
+      const offset = (page - 1) * limit;
+
+      const pageMovements = await db.query.inventoryMovements.findMany({
         where: and(...movementConditions),
         with: {
           branch: true,
@@ -794,26 +827,11 @@ export class ReportsService {
           createdBy: true,
         },
         orderBy: [desc(inventoryMovements.createdAt)],
+        limit,
+        offset,
       });
 
-      let filteredMovements = allMovements;
-      if (query.categoryId) {
-        filteredMovements = filteredMovements.filter(
-          (m) => m.product.categoryId === query.categoryId
-        );
-      }
-
-      let totalAdded = 0;
-      let totalDeducted = 0;
-      for (const m of filteredMovements) {
-        if (m.quantity > 0) {
-          totalAdded += m.quantity;
-        } else {
-          totalDeducted += Math.abs(m.quantity);
-        }
-      }
-
-      const mappedMovements = filteredMovements.map((m) => ({
+      const mappedMovements = pageMovements.map((m) => ({
         id: m.id,
         transactionId: m.transactionId,
         branchId: m.branchId,
@@ -832,19 +850,15 @@ export class ReportsService {
         createdAt: m.createdAt,
       }));
 
-      const totalRecords = mappedMovements.length;
-      const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
-      const paginatedRecords = mappedMovements.slice((page - 1) * limit, page * limit);
-
       return {
         view: "movements" as const,
         summary: {
           totalMovements: totalRecords,
-          totalUnitsAdded: totalAdded,
-          totalUnitsDeducted: totalDeducted,
-          netMovement: totalAdded - totalDeducted,
+          totalUnitsAdded: movementSummary?.totalAdded || 0,
+          totalUnitsDeducted: movementSummary?.totalDeducted || 0,
+          netMovement: (movementSummary?.totalAdded || 0) - (movementSummary?.totalDeducted || 0),
         },
-        records: paginatedRecords,
+        records: mappedMovements,
         pagination: {
           page,
           limit,

@@ -1,5 +1,5 @@
 import { db } from "../../config/database.js";
-import { products, inventoryBalances, categories } from "../../database/schema/index.js";
+import { products, inventoryBalances } from "../../database/schema/index.js";
 import { eq, and, ilike, or } from "drizzle-orm";
 import { AppError } from "../../utils/errors.js";
 import { GetBalancesQuery, GetMovementsQuery, RecordMovementParams, CreateOpeningStockInput, CreateAdjustmentInput, SubmitStocktakeInput, CreateDisposalInput } from "./schema.js";
@@ -44,6 +44,26 @@ export class InventoryService {
       );
     }
 
+    if (status) {
+      if (status === "damaged") {
+        whereConditions.push(
+          sql`EXISTS (SELECT 1 FROM ${inventoryBalances} WHERE ${inventoryBalances.productId} = ${products.id} ${targetBranchId ? sql`AND ${inventoryBalances.branchId} = ${targetBranchId}` : sql``} AND ${inventoryBalances.damagedQuantity} > 0)`
+        );
+      } else if (status === "outofstock") {
+        whereConditions.push(
+          sql`EXISTS (SELECT 1 FROM ${inventoryBalances} WHERE ${inventoryBalances.productId} = ${products.id} ${targetBranchId ? sql`AND ${inventoryBalances.branchId} = ${targetBranchId}` : sql``} AND ${inventoryBalances.availableQuantity} = 0)`
+        );
+      } else if (status === "lowstock") {
+        whereConditions.push(
+          sql`EXISTS (SELECT 1 FROM ${inventoryBalances} WHERE ${inventoryBalances.productId} = ${products.id} ${targetBranchId ? sql`AND ${inventoryBalances.branchId} = ${targetBranchId}` : sql``} AND ${inventoryBalances.availableQuantity} > 0 AND ${inventoryBalances.availableQuantity} <= ${inventoryBalances.minimumStockQuantity})`
+        );
+      } else if (status === "instock") {
+        whereConditions.push(
+          sql`EXISTS (SELECT 1 FROM ${inventoryBalances} WHERE ${inventoryBalances.productId} = ${products.id} ${targetBranchId ? sql`AND ${inventoryBalances.branchId} = ${targetBranchId}` : sql``} AND ${inventoryBalances.availableQuantity} > ${inventoryBalances.minimumStockQuantity})`
+        );
+      }
+    }
+
     const where = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
     // We fetch products with their balances, units, prices
@@ -70,13 +90,8 @@ export class InventoryService {
       }
     });
 
-    // TODO: implement Status filtering if requested (In Stock, Low Stock, etc.)
-    // It's easier to filter in memory after fetching or doing complex subqueries. 
-    // Given the limit, it's better to do it correctly via DB if data is large.
-    // For M4 slice 4.1, we will map the result to match the UI shape.
-
     try {
-      let mappedData = productsData.map((p: any) => {
+      const mappedData = productsData.map((p: any) => {
         const baseUnit = p.units.find((u: any) => u.isBase);
         const altUnit = p.units.find((u: any) => !u.isBase && u.isActive);
         const activePrice = baseUnit?.prices?.[0] || altUnit?.prices?.[0];
@@ -119,14 +134,6 @@ export class InventoryService {
         };
       });
 
-      if (status) {
-        if (status === "damaged") {
-          mappedData = mappedData.filter((m: any) => m.totalDamaged > 0);
-        } else {
-          mappedData = mappedData.filter((m: any) => m.status === status);
-        }
-      }
-
       return {
         data: mappedData
       };
@@ -138,22 +145,34 @@ export class InventoryService {
 
   static async recordMovement(params: RecordMovementParams) {
     const executeLogic = async (tx: any) => {
-      // 1. Fetch current balance or create it
-      const existingBalances = await tx.select().from(inventoryBalances)
-        .where(and(eq(inventoryBalances.branchId, params.branchId), eq(inventoryBalances.productId, params.productId)))
-        .limit(1);
-      
-      let balance = existingBalances[0];
-      if (!balance) {
-        const [newBalance] = await tx.insert(inventoryBalances).values({
+      // 1. Atomically ensure balance row exists (handles concurrent initializations)
+      await tx
+        .insert(inventoryBalances)
+        .values({
           branchId: params.branchId,
           productId: params.productId,
           availableQuantity: 0,
           damagedQuantity: 0,
           inTransitQuantity: 0,
           wac: "0",
-        }).returning();
-        balance = newBalance;
+        })
+        .onConflictDoNothing();
+
+      // 2. Fetch current balance with row-level lock (prevents race conditions and lost updates)
+      const existingBalances = await tx
+        .select()
+        .from(inventoryBalances)
+        .where(
+          and(
+            eq(inventoryBalances.branchId, params.branchId),
+            eq(inventoryBalances.productId, params.productId)
+          )
+        )
+        .for("update");
+      
+      const balance = existingBalances[0];
+      if (!balance) {
+        throw new AppError("Failed to lock inventory balance record", 500);
       }
 
       const { movementType, quantity, unitCost } = params;
@@ -398,12 +417,6 @@ export class InventoryService {
       if (existing.length > 0) {
         throw new AppError("Opening stock has already been recorded for this product and branch.", 409);
       }
-
-      // Verify product and branch exist
-      const branchExists = await tx.select().from(categories).limit(1); // just ensuring we use proper FK validation
-      // actually we can rely on FK constraints or do explicit checks. Since recordMovement handles balance creation,
-      // it implicitly uses FKs which will throw if invalid. We will let the DB throw a constraint error,
-      // or we can explicitly check. Drizzle will throw standard FK errors.
 
       // Record the movement
       const movement = await this.recordMovement({

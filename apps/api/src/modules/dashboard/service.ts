@@ -1,4 +1,4 @@
-import { sql, eq, and, desc, gte, lte, or } from "drizzle-orm";
+import { sql, eq, and, desc, gte, lte, or, asc } from "drizzle-orm";
 import { db } from "../../config/database.js";
 import {
   branches,
@@ -53,7 +53,7 @@ export class DashboardService {
       orderBy: [branches.name],
     });
 
-    // 3. Sales KPI: Today's completed sales
+    // 3. Sales KPI: Today's completed sales aggregated in PostgreSQL
     const salesFilter = and(
       eq(sales.status, "COMPLETED"),
       gte(sales.soldAt, startOfToday.toISOString()),
@@ -61,54 +61,81 @@ export class DashboardService {
       branchId ? eq(sales.branchId, branchId) : undefined
     );
 
-    const completedSalesToday = await db.query.sales.findMany({
-      where: salesFilter,
-      columns: {
-        id: true,
-        grandTotal: true,
-        branchId: true,
-        soldAt: true,
-      },
+    const [salesKpi] = await db
+      .select({
+        todaySalesTotal: sql<string>`COALESCE(SUM(${sales.grandTotal}), 0)`,
+        todayTransactionsCount: sql<number>`COUNT(*)::int`,
+      })
+      .from(sales)
+      .where(salesFilter);
+
+    const todaySalesTotal = Number(salesKpi?.todaySalesTotal || 0);
+    const todayTransactionsCount = Number(salesKpi?.todayTransactionsCount || 0);
+
+    // Sales aggregated per branch for branch performance overview
+    const branchSalesAgg = await db
+      .select({
+        branchId: sales.branchId,
+        salesAmount: sql<string>`COALESCE(SUM(${sales.grandTotal}), 0)`,
+        transactionCount: sql<number>`COUNT(*)::int`,
+      })
+      .from(sales)
+      .where(
+        and(
+          eq(sales.status, "COMPLETED"),
+          gte(sales.soldAt, startOfToday.toISOString()),
+          lte(sales.soldAt, endOfToday.toISOString()),
+          branchId ? eq(sales.branchId, branchId) : undefined
+        )
+      )
+      .groupBy(sales.branchId);
+
+    const salesByBranchMap = new Map<string, { amount: number; count: number }>();
+    branchSalesAgg.forEach((r) => {
+      salesByBranchMap.set(r.branchId, {
+        amount: Number(r.salesAmount),
+        count: Number(r.transactionCount),
+      });
     });
 
-    let todaySalesTotal = 0;
-    for (const s of completedSalesToday) {
-      todaySalesTotal += Number(s.grandTotal);
-    }
-    const todayTransactionsCount = completedSalesToday.length;
-
-    // 4. Inventory Valuation & Thresholds KPI
-    const balances = await db.query.inventoryBalances.findMany({
-      where: branchId ? eq(inventoryBalances.branchId, branchId) : undefined,
-      with: {
-        branch: true,
-        product: true,
-      },
-    });
+    // 4. Inventory Valuation & Thresholds KPI aggregated directly in PostgreSQL
+    const branchBalancesAgg = await db
+      .select({
+        branchId: inventoryBalances.branchId,
+        valuation: sql<string>`COALESCE(SUM(CASE WHEN ${inventoryBalances.availableQuantity} > 0 THEN ${inventoryBalances.availableQuantity} * ${inventoryBalances.wac} ELSE 0 END), 0)`,
+        outOfStockCount: sql<number>`COUNT(CASE WHEN ${inventoryBalances.availableQuantity} <= 0 THEN 1 END)::int`,
+        lowStockCount: sql<number>`COUNT(CASE WHEN ${inventoryBalances.availableQuantity} > 0 AND ${inventoryBalances.availableQuantity} <= ${inventoryBalances.minimumStockQuantity} THEN 1 END)::int`,
+      })
+      .from(inventoryBalances)
+      .where(branchId ? eq(inventoryBalances.branchId, branchId) : undefined)
+      .groupBy(inventoryBalances.branchId);
 
     let inventoryValuation = 0;
     let lowStockCount = 0;
     let outOfStockCount = 0;
     const lowStockBranchMap = new Map<string, number>();
     const outOfStockBranchMap = new Map<string, number>();
+    const balanceByBranchMap = new Map<string, { low: number; out: number }>();
 
-    for (const b of balances) {
-      const avail = b.availableQuantity;
-      const minStock = b.minimumStockQuantity;
-      const wac = Number(b.wac || 0);
+    const branchNameLookup = new Map<string, string>();
+    allBranches.forEach((b) => branchNameLookup.set(b.id, b.name));
 
-      if (avail > 0) {
-        inventoryValuation += avail * wac;
+    for (const b of branchBalancesAgg) {
+      inventoryValuation += Number(b.valuation);
+      lowStockCount += b.lowStockCount;
+      outOfStockCount += b.outOfStockCount;
+
+      balanceByBranchMap.set(b.branchId, {
+        low: b.lowStockCount,
+        out: b.outOfStockCount,
+      });
+
+      const bName = branchNameLookup.get(b.branchId) || "Branch";
+      if (b.lowStockCount > 0) {
+        lowStockBranchMap.set(bName, b.lowStockCount);
       }
-
-      if (avail <= 0) {
-        outOfStockCount++;
-        const current = outOfStockBranchMap.get(b.branch.name) || 0;
-        outOfStockBranchMap.set(b.branch.name, current + 1);
-      } else if (avail <= minStock) {
-        lowStockCount++;
-        const current = lowStockBranchMap.get(b.branch.name) || 0;
-        lowStockBranchMap.set(b.branch.name, current + 1);
+      if (b.outOfStockCount > 0) {
+        outOfStockBranchMap.set(bName, b.outOfStockCount);
       }
     }
 
@@ -219,23 +246,8 @@ export class DashboardService {
       : allBranches;
 
     const branchPerformance = branchesToShow.map((b) => {
-      // Sales for this branch today
-      const branchSales = completedSalesToday.filter((s) => s.branchId === b.id);
-      let salesAmount = 0;
-      for (const s of branchSales) {
-        salesAmount += Number(s.grandTotal);
-      }
-
-      // Stock status for this branch
-      const branchBalances = balances.filter((bal) => bal.branchId === b.id);
-      let bLow = 0;
-      let bOut = 0;
-      for (const bal of branchBalances) {
-        if (bal.availableQuantity <= 0) bOut++;
-        else if (bal.availableQuantity <= bal.minimumStockQuantity) bLow++;
-      }
-
-      // Closing status
+      const salesInfo = salesByBranchMap.get(b.id) || { amount: 0, count: 0 };
+      const balInfo = balanceByBranchMap.get(b.id) || { low: 0, out: 0 };
       const closing = closingByBranchMap.get(b.id);
       const closingStatus = closing
         ? (closing.status as "NOT_SUBMITTED" | "SUBMITTED" | "APPROVED" | "REJECTED")
@@ -245,10 +257,10 @@ export class DashboardService {
         branchId: b.id,
         branchName: b.name,
         branchCode: b.code,
-        todaySales: salesAmount,
-        todayTransactions: branchSales.length,
-        lowStockCount: bLow,
-        outOfStockCount: bOut,
+        todaySales: salesInfo.amount,
+        todayTransactions: salesInfo.count,
+        lowStockCount: balInfo.low,
+        outOfStockCount: balInfo.out,
         closingStatus,
         closingDiscrepancy: closing?.cashDifference ? Number(closing.cashDifference) : null,
         closingId: closing?.id || null,
@@ -265,13 +277,22 @@ export class DashboardService {
       const hourMap = new Map<number, { amount: number; count: number }>();
       hours.forEach((h) => hourMap.set(h, { amount: 0, count: 0 }));
 
-      for (const s of completedSalesToday) {
-        const d = new Date(s.soldAt);
-        const h = d.getHours();
-        if (hourMap.has(h)) {
-          const curr = hourMap.get(h)!;
-          curr.amount += Number(s.grandTotal);
-          curr.count += 1;
+      const hourlySales = await db
+        .select({
+          hour: sql<number>`EXTRACT(HOUR FROM ${sales.soldAt}::timestamptz)::int`,
+          salesAmount: sql<string>`COALESCE(SUM(${sales.grandTotal}), 0)`,
+          transactionCount: sql<number>`COUNT(*)::int`,
+        })
+        .from(sales)
+        .where(salesFilter)
+        .groupBy(sql`EXTRACT(HOUR FROM ${sales.soldAt}::timestamptz)`);
+
+      for (const hRow of hourlySales) {
+        if (hourMap.has(hRow.hour)) {
+          hourMap.set(hRow.hour, {
+            amount: Number(hRow.salesAmount),
+            count: hRow.transactionCount,
+          });
         }
       }
 
@@ -298,25 +319,28 @@ export class DashboardService {
       sevenDaysAgo.setDate(today.getDate() - 6);
       sevenDaysAgo.setHours(0, 0, 0, 0);
 
-      const past7Sales = await db.query.sales.findMany({
-        where: and(
-          eq(sales.status, "COMPLETED"),
-          gte(sales.soldAt, sevenDaysAgo.toISOString()),
-          lte(sales.soldAt, endOfToday.toISOString()),
-          branchId ? eq(sales.branchId, branchId) : undefined
-        ),
-        columns: {
-          grandTotal: true,
-          soldAt: true,
-        },
-      });
+      const past7Sales = await db
+        .select({
+          dayStr: sql<string>`TO_CHAR(${sales.soldAt}::timestamptz, 'YYYY-MM-DD')`,
+          salesAmount: sql<string>`COALESCE(SUM(${sales.grandTotal}), 0)`,
+          transactionCount: sql<number>`COUNT(*)::int`,
+        })
+        .from(sales)
+        .where(
+          and(
+            eq(sales.status, "COMPLETED"),
+            gte(sales.soldAt, sevenDaysAgo.toISOString()),
+            lte(sales.soldAt, endOfToday.toISOString()),
+            branchId ? eq(sales.branchId, branchId) : undefined
+          )
+        )
+        .groupBy(sql`TO_CHAR(${sales.soldAt}::timestamptz, 'YYYY-MM-DD')`);
 
       for (const s of past7Sales) {
-        const dStr = toDateString(new Date(s.soldAt));
-        if (dayMap.has(dStr)) {
-          const curr = dayMap.get(dStr)!;
-          curr.amount += Number(s.grandTotal);
-          curr.count += 1;
+        if (dayMap.has(s.dayStr)) {
+          const curr = dayMap.get(s.dayStr)!;
+          curr.amount = Number(s.salesAmount);
+          curr.count = s.transactionCount;
         }
       }
 
@@ -339,25 +363,28 @@ export class DashboardService {
         temp.setDate(temp.getDate() + 1);
       }
 
-      const monthSales = await db.query.sales.findMany({
-        where: and(
-          eq(sales.status, "COMPLETED"),
-          gte(sales.soldAt, startOfMonth.toISOString()),
-          lte(sales.soldAt, endOfToday.toISOString()),
-          branchId ? eq(sales.branchId, branchId) : undefined
-        ),
-        columns: {
-          grandTotal: true,
-          soldAt: true,
-        },
-      });
+      const monthSales = await db
+        .select({
+          dayStr: sql<string>`TO_CHAR(${sales.soldAt}::timestamptz, 'YYYY-MM-DD')`,
+          salesAmount: sql<string>`COALESCE(SUM(${sales.grandTotal}), 0)`,
+          transactionCount: sql<number>`COUNT(*)::int`,
+        })
+        .from(sales)
+        .where(
+          and(
+            eq(sales.status, "COMPLETED"),
+            gte(sales.soldAt, startOfMonth.toISOString()),
+            lte(sales.soldAt, endOfToday.toISOString()),
+            branchId ? eq(sales.branchId, branchId) : undefined
+          )
+        )
+        .groupBy(sql`TO_CHAR(${sales.soldAt}::timestamptz, 'YYYY-MM-DD')`);
 
       for (const s of monthSales) {
-        const dStr = toDateString(new Date(s.soldAt));
-        if (dayMap.has(dStr)) {
-          const curr = dayMap.get(dStr)!;
-          curr.amount += Number(s.grandTotal);
-          curr.count += 1;
+        if (dayMap.has(s.dayStr)) {
+          const curr = dayMap.get(s.dayStr)!;
+          curr.amount = Number(s.salesAmount);
+          curr.count = s.transactionCount;
         }
       }
 
@@ -633,36 +660,45 @@ export class DashboardService {
     }
 
     // 2. Today's Branch Sales & Employee's Own Sales (No costs/profit!)
-    const branchSalesToday = await db.query.sales.findMany({
-      where: and(
-        eq(sales.branchId, branchId),
-        eq(sales.status, "COMPLETED"),
-        gte(sales.soldAt, startOfToday.toISOString()),
-        lte(sales.soldAt, endOfToday.toISOString())
-      ),
-      columns: {
-        id: true,
-        grandTotal: true,
-        createdById: true,
-      },
-    });
+    const [salesKpi] = await db
+      .select({
+        branchSales: sql<string>`COALESCE(SUM(${sales.grandTotal}), 0)`,
+        branchTransactions: sql<number>`COUNT(*)::int`,
+        ownSales: sql<string>`COALESCE(SUM(CASE WHEN ${sales.createdById} = ${user.id} THEN ${sales.grandTotal} ELSE 0 END), 0)`,
+        ownTransactions: sql<number>`COUNT(CASE WHEN ${sales.createdById} = ${user.id} THEN 1 END)::int`,
+      })
+      .from(sales)
+      .where(
+        and(
+          eq(sales.branchId, branchId),
+          eq(sales.status, "COMPLETED"),
+          gte(sales.soldAt, startOfToday.toISOString()),
+          lte(sales.soldAt, endOfToday.toISOString())
+        )
+      );
 
-    let todayBranchSales = 0;
-    let todayOwnSales = 0;
-    let todayOwnTransactions = 0;
-
-    for (const s of branchSalesToday) {
-      const amt = Number(s.grandTotal);
-      todayBranchSales += amt;
-      if (s.createdById === user.id) {
-        todayOwnSales += amt;
-        todayOwnTransactions += 1;
-      }
-    }
+    const todayBranchSales = Number(salesKpi?.branchSales || 0);
+    const todayBranchTransactions = Number(salesKpi?.branchTransactions || 0);
+    const todayOwnSales = Number(salesKpi?.ownSales || 0);
+    const todayOwnTransactions = Number(salesKpi?.ownTransactions || 0);
 
     // 3. Branch Inventory Alerts (Zero cost, Zero WAC!)
-    const branchBalances = await db.query.inventoryBalances.findMany({
-      where: eq(inventoryBalances.branchId, branchId),
+    const [stockCounts] = await db
+      .select({
+        outOfStockCount: sql<number>`COUNT(CASE WHEN ${inventoryBalances.availableQuantity} <= 0 THEN 1 END)::int`,
+        lowStockCount: sql<number>`COUNT(CASE WHEN ${inventoryBalances.availableQuantity} > 0 AND ${inventoryBalances.availableQuantity} <= ${inventoryBalances.minimumStockQuantity} THEN 1 END)::int`,
+      })
+      .from(inventoryBalances)
+      .where(eq(inventoryBalances.branchId, branchId));
+
+    const lowStockCount = Number(stockCounts?.lowStockCount || 0);
+    const outOfStockCount = Number(stockCounts?.outOfStockCount || 0);
+
+    const alertBalances = await db.query.inventoryBalances.findMany({
+      where: and(
+        eq(inventoryBalances.branchId, branchId),
+        lte(inventoryBalances.availableQuantity, inventoryBalances.minimumStockQuantity)
+      ),
       with: {
         product: {
           with: {
@@ -670,48 +706,21 @@ export class DashboardService {
           },
         },
       },
+      orderBy: [
+        asc(inventoryBalances.availableQuantity),
+      ],
+      limit: 50,
     });
 
-    let lowStockCount = 0;
-    let outOfStockCount = 0;
-    const stockAlerts: Array<{
-      productId: string;
-      productName: string;
-      sku: string;
-      categoryName: string;
-      availableQuantity: number;
-      minimumStockQuantity: number;
-      status: "LOW_STOCK" | "OUT_OF_STOCK";
-    }> = [];
-
-    for (const b of branchBalances) {
-      const avail = b.availableQuantity;
-      const minStock = b.minimumStockQuantity;
-
-      if (avail <= 0) {
-        outOfStockCount++;
-        stockAlerts.push({
-          productId: b.productId,
-          productName: b.product.name,
-          sku: b.product.sku,
-          categoryName: b.product.category?.name || "General",
-          availableQuantity: avail,
-          minimumStockQuantity: minStock,
-          status: "OUT_OF_STOCK",
-        });
-      } else if (avail <= minStock) {
-        lowStockCount++;
-        stockAlerts.push({
-          productId: b.productId,
-          productName: b.product.name,
-          sku: b.product.sku,
-          categoryName: b.product.category?.name || "General",
-          availableQuantity: avail,
-          minimumStockQuantity: minStock,
-          status: "LOW_STOCK",
-        });
-      }
-    }
+    const stockAlerts = alertBalances.map((b) => ({
+      productId: b.productId,
+      productName: b.product.name,
+      sku: b.product.sku,
+      categoryName: b.product.category?.name || "General",
+      availableQuantity: b.availableQuantity,
+      minimumStockQuantity: b.minimumStockQuantity,
+      status: (b.availableQuantity <= 0 ? "OUT_OF_STOCK" : "LOW_STOCK") as "OUT_OF_STOCK" | "LOW_STOCK",
+    }));
 
     // Sort alerts: OUT_OF_STOCK first, then LOW_STOCK
     stockAlerts.sort((a, b) => {
@@ -812,7 +821,7 @@ export class DashboardService {
       businessDate: todayStr,
       kpis: {
         todayBranchSales: Math.round(todayBranchSales * 100) / 100,
-        todayBranchTransactions: branchSalesToday.length,
+        todayBranchTransactions,
         todayOwnSales: Math.round(todayOwnSales * 100) / 100,
         todayOwnTransactions,
         lowStockCount,

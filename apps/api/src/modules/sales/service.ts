@@ -39,6 +39,10 @@ export class SalesService {
       throw new AppError("Only owners can apply discounts", 403, "FORBIDDEN");
     }
 
+    if (!isOwner && user?.branchId && input.branchId !== user.branchId) {
+      throw new AppError("You do not have permission to record sales for another branch", 403, "AUTHORIZATION_ERROR");
+    }
+
     return db.transaction(async (tx) => {
       // 1. Idempotency check
       if (input.idempotencyKey) {
@@ -69,7 +73,21 @@ export class SalesService {
         }
       }
 
-      // 2. Process items
+      // 2. Pre-lock inventory balances in deterministic productId order to eliminate deadlock risk across concurrent sales
+      const sortedProductIds = Array.from(new Set(input.items.map((i) => i.productId))).sort();
+      const balanceMap = new Map<string, any>();
+      for (const pId of sortedProductIds) {
+        const [lockedBalance] = await tx
+          .select()
+          .from(inventoryBalances)
+          .where(and(eq(inventoryBalances.branchId, input.branchId), eq(inventoryBalances.productId, pId)))
+          .for("update");
+        if (lockedBalance) {
+          balanceMap.set(pId, lockedBalance);
+        }
+      }
+
+      // 3. Process items
       let grossSubtotal = 0;
       const processedItems = [];
 
@@ -99,12 +117,8 @@ export class SalesService {
           baseQuantity = item.quantity * Number(conversion.conversionQuantity);
         }
 
-        // Get current WAC (requires FOR UPDATE to ensure inventory lock)
-        const balances = await tx.select().from(inventoryBalances)
-          .where(and(eq(inventoryBalances.branchId, input.branchId), eq(inventoryBalances.productId, item.productId)))
-          .for('update');
-        
-        const balance = balances[0];
+        // Retrieve pre-locked balance
+        const balance = balanceMap.get(item.productId);
         if (!balance || balance.availableQuantity < baseQuantity) {
           throw new AppError(`Insufficient stock for product ${item.productId}`, 400);
         }

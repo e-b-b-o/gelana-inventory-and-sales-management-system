@@ -49,12 +49,16 @@ export class ClosingService {
     // 1. Fetch all active payment methods or reuse preloaded
     const activePaymentMethods = preloadedPaymentMethods || await tx.select().from(paymentMethods).where(eq(paymentMethods.isActive, true));
 
-    // 2. Fetch completed sales for this branch and date
+    const startOfDay = `${dateStr} 00:00:00`;
+    const endOfDay = `${dateStr} 23:59:59.999`;
+
+    // 2. Fetch completed sales for this branch and date using index-sargable range filter
     const completedSales = await tx.query.sales.findMany({
       where: and(
         eq(sales.branchId, branchId),
         eq(sales.status, "COMPLETED"),
-        sql`(${sales.soldAt})::date = ${dateStr}::date`
+        gte(sales.soldAt, startOfDay),
+        lte(sales.soldAt, endOfDay)
       ),
       with: {
         payments: {
@@ -65,12 +69,13 @@ export class ClosingService {
       },
     });
 
-    // 3. Fetch completed sales returns for this branch and date
+    // 3. Fetch completed sales returns for this branch and date using index-sargable range filter
     const completedReturns = await tx.query.salesReturns.findMany({
       where: and(
         eq(salesReturns.branchId, branchId),
         eq(salesReturns.status, "COMPLETED"),
-        sql`(${salesReturns.returnedAt})::date = ${dateStr}::date`
+        gte(salesReturns.returnedAt, startOfDay),
+        lte(salesReturns.returnedAt, endOfDay)
       ),
       with: {
         refundPaymentMethod: true,
