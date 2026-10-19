@@ -19,6 +19,31 @@ export const errorHandler = (
     return;
   }
 
+  const dbCode = (err as any)?.code || (err as any)?.cause?.code;
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (dbCode === "23505") {
+    const detail = (err as any)?.detail || (err as any)?.cause?.detail;
+    res.status(409).json({
+      error: {
+        code: "CONFLICT",
+        message: !isProduction && detail ? `Unique constraint conflict: ${detail}` : "A record with this unique value already exists.",
+        details: isProduction ? undefined : detail,
+      },
+    });
+    return;
+  }
+
+  if (dbCode === "23503") {
+    res.status(400).json({
+      error: {
+        code: "FOREIGN_KEY_VIOLATION",
+        message: "Referenced record does not exist or is currently in use.",
+      },
+    });
+    return;
+  }
+
   if (!(err instanceof AppError) || !err.isOperational) {
     console.error("Error caught in Middleware:", err);
   }

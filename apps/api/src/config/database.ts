@@ -8,8 +8,14 @@ if (!process.env.DATABASE_URL) {
 
 import * as schema from "../database/schema/index.js";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+const databaseUrl = process.env.DATABASE_URL;
+const isNeon = databaseUrl.includes("neon.tech");
+const isSslExplicit = process.env.DATABASE_SSL === "true" || databaseUrl.includes("sslmode=require");
+const useSsl = isNeon || isSslExplicit;
+
+export const pool = new Pool({
+  connectionString: databaseUrl,
+  ssl: useSsl ? { rejectUnauthorized: true } : undefined,
 });
 
 export const db = drizzle(pool, { schema });

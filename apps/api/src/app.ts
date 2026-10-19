@@ -24,11 +24,27 @@ import { reportsRouter } from "./modules/reports/routes.js";
 import { notificationsRouter } from "./modules/notifications/routes.js";
 import { auditRouter } from "./modules/audit/routes.js";
 import { settingsRouter } from "./modules/settings/routes.js";
+import { searchRouter } from "./modules/search/routes.js";
 
 export const app = express();
 
 
-const ALLOWED_ORIGINS = ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"];
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:5175",
+];
+
+const envOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const ALLOWED_ORIGINS = Array.from(new Set([...defaultOrigins, ...envOrigins]));
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
@@ -37,6 +53,10 @@ const generalLimiter = rateLimit({
   message: { error: { code: "RATE_LIMIT_EXCEEDED", message: "Too many requests, please try again later" } },
 });
 
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.use(helmet());
 app.use(
   cors({
@@ -44,7 +64,7 @@ app.use(
       if (!origin || ALLOWED_ORIGINS.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS origin ${origin} not allowed`));
+        callback(null, false);
       }
     },
     credentials: true,
@@ -80,5 +100,6 @@ app.use("/api/v1/reports", reportsRouter);
 app.use("/api/v1/notifications", notificationsRouter);
 app.use("/api/v1/audit-logs", auditRouter);
 app.use("/api/v1/settings", settingsRouter);
+app.use("/api/v1/search", searchRouter);
 
 app.use(errorHandler);

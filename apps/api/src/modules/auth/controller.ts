@@ -5,6 +5,20 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { signToken } from "./jwt.js";
 import { AppError } from "../../utils/errors.js";
 
+function getCookieOptions() {
+  const isProduction = process.env.NODE_ENV === "production";
+  const sameSite = (process.env.COOKIE_SAME_SITE as "strict" | "lax" | "none") || (isProduction ? "none" : "lax");
+  const secure = process.env.COOKIE_SECURE !== undefined
+    ? process.env.COOKIE_SECURE === "true"
+    : (isProduction || sameSite === "none");
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite,
+  };
+}
+
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
 
@@ -20,10 +34,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     branchId: user.branch,
   });
 
+  const cookieOptions = getCookieOptions();
+
   res.cookie("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    ...cookieOptions,
     maxAge: 24 * 60 * 60 * 1000,
   });
 
@@ -31,11 +45,9 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
+  const cookieOptions = getCookieOptions();
+
+  res.clearCookie("token", cookieOptions);
 
   res.json({ message: "Logged out successfully" });
 });
