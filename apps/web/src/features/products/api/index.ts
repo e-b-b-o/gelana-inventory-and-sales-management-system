@@ -30,15 +30,37 @@ export interface CreateProductInput {
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {}
 
-export const useProducts = (options?: { enabled?: boolean }) => {
+export interface ProductQueryParams {
+  search?: string;
+  categoryId?: string;
+  isActive?: boolean;
+}
+
+export const useProducts = (
+  paramsOrOptions?: ProductQueryParams | { enabled?: boolean },
+  options?: { enabled?: boolean }
+) => {
+  const isParams =
+    paramsOrOptions &&
+    ("search" in paramsOrOptions || "categoryId" in paramsOrOptions || "isActive" in paramsOrOptions);
+  const params = isParams ? (paramsOrOptions as ProductQueryParams) : undefined;
+  const opts = isParams ? options : (paramsOrOptions as { enabled?: boolean });
+
   return useQuery<Product[]>({
-    queryKey: ["products"],
-    queryFn: async () => {
-      const response = await fetchApi("/products");
+    queryKey: ["products", params?.search, params?.categoryId, params?.isActive],
+    queryFn: async ({ signal }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.search?.trim()) searchParams.append("search", params.search.trim());
+      if (params?.categoryId) searchParams.append("categoryId", params.categoryId);
+      if (params?.isActive !== undefined) searchParams.append("isActive", String(params.isActive));
+
+      const qs = searchParams.toString();
+      const endpoint = qs ? `/products?${qs}` : "/products";
+      const response = await fetchApi(endpoint, { signal });
       return response as Product[];
     },
     staleTime: 3 * 60 * 1000,
-    enabled: options?.enabled,
+    enabled: opts?.enabled,
   });
 };
 

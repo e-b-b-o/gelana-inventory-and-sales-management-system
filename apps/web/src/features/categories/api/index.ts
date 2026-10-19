@@ -8,15 +8,33 @@ export interface Category {
   createdAt: string;
 }
 
-export function useCategories(options?: { enabled?: boolean }) {
+export interface CategoryQueryParams {
+  search?: string;
+  isActive?: boolean;
+}
+
+export function useCategories(
+  paramsOrOptions?: CategoryQueryParams | { enabled?: boolean },
+  options?: { enabled?: boolean }
+) {
+  const isParams = paramsOrOptions && ("search" in paramsOrOptions || "isActive" in paramsOrOptions);
+  const params = isParams ? (paramsOrOptions as CategoryQueryParams) : undefined;
+  const opts = isParams ? options : (paramsOrOptions as { enabled?: boolean });
+
   return useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const response = await fetchApi("/categories");
+    queryKey: ["categories", params?.search, params?.isActive],
+    queryFn: async ({ signal }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.search?.trim()) searchParams.append("search", params.search.trim());
+      if (params?.isActive !== undefined) searchParams.append("isActive", String(params.isActive));
+
+      const qs = searchParams.toString();
+      const endpoint = qs ? `/categories?${qs}` : "/categories";
+      const response = await fetchApi(endpoint, { signal });
       return response.data as Category[];
     },
     staleTime: 5 * 60 * 1000,
-    enabled: options?.enabled,
+    enabled: opts?.enabled,
   });
 }
 

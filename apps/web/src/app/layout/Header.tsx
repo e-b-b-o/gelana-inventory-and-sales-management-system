@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { useQueryClient, QueryClient } from "@tanstack/react-query";
 import type { Product } from "../../features/products/api";
 import { useUnreadCountQuery } from "../../features/notifications/api";
+import { GlobalSearchDialog } from "../../features/search/GlobalSearchDialog";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KNOWN_STATIC_SEGMENTS = new Set([
@@ -122,8 +124,21 @@ interface HeaderProps {
 export function Header({ user, onOpenMobile }: HeaderProps) {
   const location = useLocation();
   const queryClient = useQueryClient();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { data: unreadData } = useUnreadCountQuery({ enabled: Boolean(user) });
   const unreadCount = (unreadData as any)?.unreadCount ?? (unreadData as any)?.data?.unreadCount ?? 0;
+
+  // Global keyboard shortcut: Ctrl+K / Cmd+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Robust breadcrumb generation supporting dynamic detail routes and query cache lookup
   const generateBreadcrumbs = () => {
@@ -180,7 +195,22 @@ export function Header({ user, onOpenMobile }: HeaderProps) {
       </div>
 
       {/* Trailing Status, Branch and Notification Controls */}
-      <div className="flex items-center gap-2 sm:gap-5 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Global Search Button Trigger */}
+        <button
+          type="button"
+          onClick={() => setIsSearchOpen(true)}
+          className="flex items-center gap-2 px-2.5 py-1 sm:px-3 bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface rounded border border-outline-variant transition-colors cursor-pointer"
+          title="Search across pages and records (Ctrl+K)"
+          aria-label="Search"
+        >
+          <span className="material-symbols-outlined text-[18px]">search</span>
+          <span className="hidden md:inline text-label-md font-label-md text-on-surface-variant">Search...</span>
+          <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-on-surface-variant bg-surface rounded border border-outline-variant shadow-xs">
+            Ctrl K
+          </kbd>
+        </button>
+
         {/* Branch Selector / Indicator */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 bg-surface-container-low rounded border border-outline-variant">
           <span className="material-symbols-outlined text-on-surface-variant text-[18px]">store</span>
@@ -189,7 +219,7 @@ export function Header({ user, onOpenMobile }: HeaderProps) {
         </div>
 
         {/* Notification Bell Link */}
-        <div className="pl-2 border-l border-outline-variant">
+        <div className="pl-1 sm:pl-2 border-l border-outline-variant">
           <Link
             to="/notifications"
             className="relative p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors flex items-center justify-center cursor-pointer"
@@ -205,6 +235,11 @@ export function Header({ user, onOpenMobile }: HeaderProps) {
           </Link>
         </div>
       </div>
+
+      <GlobalSearchDialog
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
     </header>
   );
 }
